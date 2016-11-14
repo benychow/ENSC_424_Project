@@ -1,0 +1,12 @@
+﻿C:\Program Files (x86)\MSBuild\Microsoft.Cpp\v4.0\V140\Microsoft.CppBuild.targets(392,5): warning MSB8028: The intermediate directory (.\Debug\) contains files shared from another project (acenc.vcxproj, psnr.vcxproj).  This can lead to incorrect clean and rebuild behavior.
+  codeclib.cpp
+e:\documents\sfu\ensc 424\hw2\codeclib.cpp(92): warning C4244: '=': conversion from 'float' to 'int', possible loss of data
+e:\documents\sfu\ensc 424\hw2\codeclib.cpp(94): warning C4244: '=': conversion from 'int' to 'float', possible loss of data
+e:\documents\sfu\ensc 424\hw2\codeclib.cpp(113): warning C4244: '=': conversion from 'float' to 'int', possible loss of data
+e:\documents\sfu\ensc 424\hw2\codeclib.cpp(117): warning C4244: 'argument': conversion from 'int' to 'float', possible loss of data
+e:\documents\sfu\ensc 424\hw2\codeclib.cpp(117): warning C4244: '=': conversion from 'double' to 'float', possible loss of data
+e:\documents\sfu\ensc 424\hw2\codeclib.cpp(135): warning C4244: '=': conversion from 'float' to 'int', possible loss of data
+e:\documents\sfu\ensc 424\hw2\codeclib.cpp(137): warning C4244: '=': conversion from 'int' to 'float', possible loss of data
+acdec.obj : warning LNK4075: ignoring '/EDITANDCONTINUE' due to '/OPT:LBR' specification
+  acdec.vcxproj -> E:\Documents\sfu\ENSC 424\HW2\.\Debug\acdec.exe
+  acdec.vcxproj -> .\Debug/acdec.pdb (Full PDB)
