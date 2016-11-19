@@ -92,13 +92,15 @@ unsigned char * EntropyEncode::encodeVLC(float *pDCTBuf, int iWidth, int iHeight
 			}
 
 
-			coeffCounter2 += 16;
+
 
 			//store total zeros
 			totalZeros[coeffCounter3] = countZeros(scannedBlock);
 			//this coding of run function is missing the special case, intended to be adding in the encoding part
 			//i.e. if the number of coefficients if 0, then the last zeroLeft and runBefore will not be encoded
 			codingOfRuns(countZeros(scannedBlock), zeroLeft, runBefore, scannedBlock, coeffCounter2);
+
+			coeffCounter2 += 16;
 
 			coeffCounter3++;
 		}
@@ -223,10 +225,17 @@ int * EntropyEncode::reverseLevels(float *scannedArray)
 		}
 	}
 
-	for(j - 1; j >= 0; j--)
+	for (int k = 0; k < 15; k++)
+	{
+		if (j > 0)
+		{
+			orderedArray[k] = tempArray[j - 1];
+			j--;
+		}
+	}
 
 
-	return tempArray;
+	return orderedArray;
 }
 
 unsigned char * EntropyEncode::signTrailOnes(float *scannedArray)
