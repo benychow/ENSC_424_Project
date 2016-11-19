@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <iostream>
 #include <fstream>
+#include <string>
 
 using namespace std;
 
@@ -43,6 +44,10 @@ unsigned char * EntropyEncode::encodeVLC(float *pDCTBuf, int iWidth, int iHeight
 	//starting top left corner of each 4x4
 	int xStart1 = 0;
 	int xStart2 = 0;
+
+	SyntaxElement  se;
+	Bitstream outputStream;
+	outputStream.write_flag = 0;
 
 	for (int i = 0; i < (iHeight / 4); i++)
 	{
@@ -91,9 +96,6 @@ unsigned char * EntropyEncode::encodeVLC(float *pDCTBuf, int iWidth, int iHeight
 				nonZeroCoefficientsStorage[coeffCounter2 + k] = nonZeroCoefficients[k];
 			}
 
-
-
-
 			//store total zeros
 			totalZeros[coeffCounter3] = countZeros(scannedBlock);
 			//this coding of run function is missing the special case, intended to be adding in the encoding part
@@ -114,10 +116,183 @@ unsigned char * EntropyEncode::encodeVLC(float *pDCTBuf, int iWidth, int iHeight
 		averageN = adaptiveNumtrail(i, coeffTokens3D, iWidth,  iHeight);
 	}
 
+	se.value1 = coeffTokens3D[1];
+	se.value2 = coeffTokens3D[2];
+	se.len = 0;
 
-	cout << "SENT FLOWERS BUT U DIDN'T RECEIVE THEM" << endl;
+	writeSyntaxElement_NumCoeffTrailingOnes(&se, &outputStream);
+
+
+
+
+	cout << "FUCK U" << endl;
 
 	return bitStream;
+}
+
+int EntropyEncode::writeSyntaxElement_NumCoeffTrailingOnes(SyntaxElement *se, Bitstream *bitstream)
+{
+	static const byte lentab[3][4][17] = 
+	{
+		{   // 0702
+			{ 1, 6, 8, 9,10,11,13,13,13,14,14,15,15,16,16,16,16 },
+			{ 0, 2, 6, 8, 9,10,11,13,13,14,14,15,15,15,16,16,16 },
+			{ 0, 0, 3, 7, 8, 9,10,11,13,13,14,14,15,15,16,16,16 },
+			{ 0, 0, 0, 5, 6, 7, 8, 9,10,11,13,14,14,15,15,16,16 },
+		},
+		{
+			{ 2, 6, 6, 7, 8, 8, 9,11,11,12,12,12,13,13,13,14,14 },
+			{ 0, 2, 5, 6, 6, 7, 8, 9,11,11,12,12,13,13,14,14,14 },
+			{ 0, 0, 3, 6, 6, 7, 8, 9,11,11,12,12,13,13,13,14,14 },
+			{ 0, 0, 0, 4, 4, 5, 6, 6, 7, 9,11,11,12,13,13,13,14 },
+		},
+		{
+			{ 4, 6, 6, 6, 7, 7, 7, 7, 8, 8, 9, 9, 9,10,10,10,10 },
+			{ 0, 4, 5, 5, 5, 5, 6, 6, 7, 8, 8, 9, 9, 9,10,10,10 },
+			{ 0, 0, 4, 5, 5, 5, 6, 6, 7, 7, 8, 8, 9, 9,10,10,10 },
+			{ 0, 0, 0, 4, 4, 4, 4, 4, 5, 6, 7, 8, 8, 9,10,10,10 },
+		},
+
+	};
+
+	static const byte codtab[3][4][17] =
+	{
+		{
+			{ 1, 5, 7, 7, 7, 7,15,11, 8,15,11,15,11,15,11, 7,4 },
+			{ 0, 1, 4, 6, 6, 6, 6,14,10,14,10,14,10, 1,14,10,6 },
+			{ 0, 0, 1, 5, 5, 5, 5, 5,13, 9,13, 9,13, 9,13, 9,5 },
+			{ 0, 0, 0, 3, 3, 4, 4, 4, 4, 4,12,12, 8,12, 8,12,8 },
+		},
+		{
+			{ 3,11, 7, 7, 7, 4, 7,15,11,15,11, 8,15,11, 7, 9,7 },
+			{ 0, 2, 7,10, 6, 6, 6, 6,14,10,14,10,14,10,11, 8,6 },
+			{ 0, 0, 3, 9, 5, 5, 5, 5,13, 9,13, 9,13, 9, 6,10,5 },
+			{ 0, 0, 0, 5, 4, 6, 8, 4, 4, 4,12, 8,12,12, 8, 1,4 },
+		},
+		{
+			{ 15,15,11, 8,15,11, 9, 8,15,11,15,11, 8,13, 9, 5,1 },
+			{ 0,14,15,12,10, 8,14,10,14,14,10,14,10, 7,12, 8,4 },
+			{ 0, 0,13,14,11, 9,13, 9,13,10,13, 9,13, 9,11, 7,3 },
+			{ 0, 0, 0,12,11,10, 9, 8,13,12,12,12, 8,12,10, 6,2 },
+		},
+	};
+
+	int vlcnum = se->len;
+
+	// se->value1 : numcoeff
+	// se->value2 : numtrailingones
+
+	if (vlcnum == 3) //FLC case
+	{
+		se->len = 6;
+		if (se->value1 > 0)
+		{
+			se->inf = ((se->value1 - 1) << 2) | se->value2;
+		}
+		else
+		{
+			se->inf = 3;
+		}
+	}
+	else
+	{
+		se->len = lentab[vlcnum][se->value2][se->value1];
+		se->inf = codtab[vlcnum][se->value2][se->value1];
+	}
+
+	if (se->len == 0)
+	{
+		cout << "ERROR: (numcoeff, trailingones) not valid: vlc = " << vlcnum <<
+			" (" << se->value1 << ", " << se->value2 << ")" << endl;
+	}
+
+	symbol2vlc(se);
+
+	writeUVLC2buffer(se, bitstream);
+
+	bitstream->write_flag = 1;
+
+	return (se->len);
+}
+
+void EntropyEncode::writeUVLC2buffer(SyntaxElement *se, Bitstream *currStream)
+{
+	unsigned int mask = 1 << (se->len - 1);
+	byte *byte_buf = &currStream->byte_buf;
+	int *bits_to_go = &currStream->bits_to_go;
+	int i;
+
+	// Add the new bits to the bitstream.
+	// Write out a byte if it is full
+	if (se->len < 33)
+	{
+		for (i = 0; i < se->len; i++)
+		{
+			*byte_buf <<= 1;
+
+			if (se->bitpattern & mask)
+				*byte_buf |= 1;
+
+			mask >>= 1;
+
+			if ((--(*bits_to_go)) == 0)
+			{
+				*bits_to_go = 8;
+				currStream->streamBuffer[currStream->byte_pos++] = *byte_buf;
+				*byte_buf = 0;
+			}
+		}
+	}
+	else
+	{
+		// zeros
+		for (i = 0; i < (se->len - 32); i++)
+		{
+			*byte_buf <<= 1;
+
+			if ((--(*bits_to_go)) == 0)
+			{
+				*bits_to_go = 8;
+				currStream->streamBuffer[currStream->byte_pos++] = *byte_buf;
+				*byte_buf = 0;
+			}
+		}
+		// actual info
+		mask = (unsigned int)1 << 31;
+		for (i = 0; i < 32; i++)
+		{
+			*byte_buf <<= 1;
+
+			if (se->bitpattern & mask)
+				*byte_buf |= 1;
+
+			mask >>= 1;
+
+			if ((--(*bits_to_go)) == 0)
+			{
+				*bits_to_go = 8;
+				currStream->streamBuffer[currStream->byte_pos++] = *byte_buf;
+				*byte_buf = 0;
+			}
+		}
+	}
+}
+
+int EntropyEncode::symbol2vlc(SyntaxElement *sym)
+{
+	int info_len = sym->len;
+
+	//convert info into a bitpattern
+	sym->bitpattern = 0;
+
+	//vlc coding
+	while (--info_len >= 0)
+	{
+		sym->bitpattern <<= 1;
+		sym->bitpattern |= (0x01 & (sym->inf >> info_len));
+	}
+
+	return 0;
 }
 
 void EntropyEncode::codingOfRuns(int countZeros, int *zeroLeft, int *runBefore, float *scannedArray, int coeffCounter2)
