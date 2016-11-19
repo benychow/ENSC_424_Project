@@ -6,7 +6,7 @@ public:
 	~EntropyEncode(void);
 
 	unsigned char *encodeVLC(float *pDCTBuf, int iWidth, int iHeight);
-	float *zScan(float *, int xStart);
+	float *zScan(float *, int xStart, int iWidth);
 	int * countCoeffToken(float *scannedBlock);
 	int adaptiveNumtrail(int xStart, int *coeffTokens3D, int iWidth, int iHeight);
 	unsigned char *signTrailOnes(float *scannedArray);

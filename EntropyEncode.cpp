@@ -46,11 +46,27 @@ unsigned char * EntropyEncode::encodeVLC(float *pDCTBuf, int iWidth, int iHeight
 
 	for (int i = 0; i < (iHeight / 4); i++)
 	{
-		xStart1 = i * 512 * 4;
+		xStart1 = i * iHeight * 4;
 		for (int j = 0; j < (iWidth / 4); j++)
 		{
 			xStart2 = xStart1 + j * 4; //Starting location for top left of each 4x4 dct block
-			scannedBlock = zScan(pDCTBuf, xStart2);
+			//scannedBlock = zScan(pDCTBuf, xStart2, iWidth);
+			scannedBlock[0] = 0;;
+			scannedBlock[1] = 3;
+			scannedBlock[2] = 0;
+			scannedBlock[3] = 1;
+			scannedBlock[4] = -1;
+			scannedBlock[5] = -1;
+			scannedBlock[6] = 0;
+			scannedBlock[7] = 1;
+			scannedBlock[8] = 0;
+			scannedBlock[9] = 0;
+			scannedBlock[10] = 0;
+			scannedBlock[11] = 0;
+			scannedBlock[12] = 0;
+			scannedBlock[13] = 0;
+			scannedBlock[14] = 0;
+			scannedBlock[15] = 0;
 
 			//count coeff tokens
 			coeffTokens = countCoeffToken(scannedBlock);
@@ -172,6 +188,7 @@ int EntropyEncode::countZeros(float *scannedArray)
 int * EntropyEncode::reverseLevels(float *scannedArray)
 {
 	int tempArray[] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+	int orderedArray[] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
 	int oneCounter = 3; //if the one is part of the trailing 1s, do not include
 	int arrayCounter = 0;
 
@@ -191,6 +208,23 @@ int * EntropyEncode::reverseLevels(float *scannedArray)
 			}
 		}
 	}
+
+	bool lastNonZero = false;
+	int j = 0;
+	while (!lastNonZero)
+	{
+		if (tempArray[j] == 0)
+		{
+			lastNonZero = true;
+		}
+		else
+		{
+			j++;
+		}
+	}
+
+	for(j - 1; j >= 0; j--)
+
 
 	return tempArray;
 }
@@ -270,7 +304,7 @@ int EntropyEncode::adaptiveNumtrail(int xStart, int *coeffTokens3D, int iWidth, 
 	}
 }
 
-float * EntropyEncode::zScan(float *pDCTBuf, int xStart)
+float * EntropyEncode::zScan(float *pDCTBuf, int xStart, int iWidth)
 {
 	float *scannedArray;
 	scannedArray = new float[16];
@@ -278,20 +312,20 @@ float * EntropyEncode::zScan(float *pDCTBuf, int xStart)
 	//perform zig zag scan
 	scannedArray[0] = pDCTBuf[xStart];
 	scannedArray[1] = pDCTBuf[xStart + 1];
-	scannedArray[2] = pDCTBuf[xStart + 512];
-	scannedArray[3] = pDCTBuf[xStart + (512 * 2)];
-	scannedArray[4] = pDCTBuf[xStart + (512 + 1)];
+	scannedArray[2] = pDCTBuf[xStart + iWidth];
+	scannedArray[3] = pDCTBuf[xStart + (iWidth * 2)];
+	scannedArray[4] = pDCTBuf[xStart + (iWidth + 1)];
 	scannedArray[5] = pDCTBuf[xStart + 2];
 	scannedArray[6] = pDCTBuf[xStart + 3];
-	scannedArray[7] = pDCTBuf[xStart + (512 + 2)];
-	scannedArray[8] = pDCTBuf[xStart + (512 * 2) + 1];
-	scannedArray[9] = pDCTBuf[xStart + (512 * 3)];
-	scannedArray[10] = pDCTBuf[xStart + (512 * 3) + 1];
-	scannedArray[11] = pDCTBuf[xStart + (512 * 2) + 2];
-	scannedArray[12] = pDCTBuf[xStart + (512 + 3)];
-	scannedArray[13] = pDCTBuf[xStart + (512 * 2)];
-	scannedArray[14] = pDCTBuf[xStart + (512 * 3) + 2];
-	scannedArray[15] = pDCTBuf[xStart + (512 * 3) + 3];
+	scannedArray[7] = pDCTBuf[xStart + (iWidth + 2)];
+	scannedArray[8] = pDCTBuf[xStart + (iWidth * 2) + 1];
+	scannedArray[9] = pDCTBuf[xStart + (iWidth * 3)];
+	scannedArray[10] = pDCTBuf[xStart + (iWidth * 3) + 1];
+	scannedArray[11] = pDCTBuf[xStart + (iWidth * 2) + 2];
+	scannedArray[12] = pDCTBuf[xStart + (iWidth + 3)];
+	scannedArray[13] = pDCTBuf[xStart + (iWidth * 2)];
+	scannedArray[14] = pDCTBuf[xStart + (iWidth * 3) + 2];
+	scannedArray[15] = pDCTBuf[xStart + (iWidth * 3) + 3];
 
 	return scannedArray;
 }
