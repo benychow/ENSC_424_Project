@@ -44,14 +44,18 @@ public:
 	float *zScan(float *, int xStart, int iWidth);
 	int * countCoeffToken(float *scannedBlock);
 	int adaptiveNumtrail(int xStart, int *coeffTokens3D, int iWidth, int iHeight);
-	unsigned char *signTrailOnes(float *scannedArray);
+	int *signTrailOnes(float *scannedArray);
 	int * reverseLevels(float *scannedArray);
 	int countZeros(float *scannedArray);
 	void codingOfRuns(int countZeros, int *zeroLeft, int *runBefore, float *scannedArray, int coeffCounter2);
 	int writeSyntaxElement_NumCoeffTrailingOnes(SyntaxElement *se, Bitstream *bitstream);
 	int symbol2vlc(SyntaxElement *sym);
 	void writeUVLC2buffer(SyntaxElement *se, Bitstream *currStream);
-
+	int writeSyntaxElement_VLC(SyntaxElement *se, Bitstream *bitstream);
+	int writeSyntaxElement_level_VLC1(SyntaxElement *se, Bitstream *bitstream);
+	int writeSyntaxElement_level_VLCN(SyntaxElement *se, int vlc, Bitstream *bitstream);
+	int writeSyntaxElement_TotalZeros(SyntaxElement *se, Bitstream *bitstream);
+	int writeSyntaxElement_Run(SyntaxElement *se, Bitstream *bitstream);
 
 
 private:

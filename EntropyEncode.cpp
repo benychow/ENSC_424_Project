@@ -6,6 +6,13 @@
 
 using namespace std;
 
+#define MAXRTPPAYLOADLEN  (65536 - 40)  
+
+static inline int imin(int a, int b)
+{
+	return ((a) < (b) ? (a) : (b));
+}
+
 EntropyEncode::EntropyEncode(void)
 {
 }
@@ -27,8 +34,9 @@ unsigned char * EntropyEncode::encodeVLC(float *pDCTBuf, int iWidth, int iHeight
 
 	int averageN;
 
-	unsigned char *signOnes = new unsigned char[2];
-	unsigned char *signOneStorage = new unsigned char[(iWidth / 4) * (iHeight / 4) * 3]; //storage array for signs of 1 similar to coeffTokens3D
+	int *signOnes = new int[2];
+	int *signOnesStorage = new int[(iWidth / 4) * (iHeight / 4) * 2];
+	int coeffCounter4 = 0;
 
 	int *nonZeroCoefficients = new int[16]();
 	int *nonZeroCoefficientsStorage = new int[(iWidth / 4) * (iHeight / 4) * 16];
@@ -40,6 +48,11 @@ unsigned char * EntropyEncode::encodeVLC(float *pDCTBuf, int iWidth, int iHeight
 	int *zeroLeft = new int[(iWidth / 4) * (iHeight / 4) * 16]();
 	int *runBefore = new int[(iWidth / 4) * (iHeight / 4) * 16]();
 
+	int level_two_or_higher, vlcnum;
+	static const int incVlc[] = { 0, 3, 6, 12, 24, 48, 32768 };  // maximum vlc = 6
+
+	int run, zerosleft, numcoef;
+
 	//for each 4x4 block, call a zigzag
 	//starting top left corner of each 4x4
 	int xStart1 = 0;
@@ -47,6 +60,11 @@ unsigned char * EntropyEncode::encodeVLC(float *pDCTBuf, int iWidth, int iHeight
 
 	SyntaxElement  se;
 	Bitstream outputStream;
+	//initialize bitstream parameters
+	outputStream.byte_buf = 0;
+	outputStream.bits_to_go = 8;
+	outputStream.byte_pos = 0;
+	outputStream.streamBuffer = new byte[MAXRTPPAYLOADLEN];
 	outputStream.write_flag = 0;
 
 	for (int i = 0; i < (iHeight / 4); i++)
@@ -82,12 +100,9 @@ unsigned char * EntropyEncode::encodeVLC(float *pDCTBuf, int iWidth, int iHeight
 			
 			//Encode the signs of trailing 1s in reverse order, 0 for positive, 1 for negative
 			signOnes = signTrailOnes(scannedBlock);
-			//store the signs in a 3d array
-			signOneStorage[coeffCounter] = signOnes[0];
-			signOneStorage[coeffCounter + 1] = signOnes[1];
-			signOneStorage[coeffCounter + 2] = signOnes[2];
-
-			coeffCounter += 3;
+			signOnesStorage[coeffCounter4] = signOnes[0]; //codeowrd
+			signOnesStorage[coeffCounter4 + 1] = signOnes[1]; //length
+			
 
 			//scan for remaining non-zero coefficients not part of num trail
 			nonZeroCoefficients = reverseLevels(scannedBlock);
@@ -102,9 +117,10 @@ unsigned char * EntropyEncode::encodeVLC(float *pDCTBuf, int iWidth, int iHeight
 			//i.e. if the number of coefficients if 0, then the last zeroLeft and runBefore will not be encoded
 			codingOfRuns(countZeros(scannedBlock), zeroLeft, runBefore, scannedBlock, coeffCounter2);
 
+			coeffCounter += 3;
 			coeffCounter2 += 16;
-
 			coeffCounter3++;
+			coeffCounter4 += 2;
 		}
 	}
 
@@ -116,18 +132,283 @@ unsigned char * EntropyEncode::encodeVLC(float *pDCTBuf, int iWidth, int iHeight
 		averageN = adaptiveNumtrail(i, coeffTokens3D, iWidth,  iHeight);
 	}
 
+
+	//step 1 coeff num and trail 1 encode
 	se.value1 = coeffTokens3D[1];
 	se.value2 = coeffTokens3D[2];
 	se.len = 0;
 
 	writeSyntaxElement_NumCoeffTrailingOnes(&se, &outputStream);
 
+	if (coeffTokens3D[1])
+	{
+		//step 2 sign of trail 1 encode
+		se.value1 = signOnesStorage[0];
+		se.value2 = signOnesStorage[1];
 
+		writeSyntaxElement_VLC(&se, &outputStream);
 
+		//step 3 encode the remaining non-zero coeffs in reverse order
+		//decide which vlc to use
+		level_two_or_higher = (coeffTokens3D[1] > 3 && coeffTokens3D[2] == 3) ? 0 : 1;
+		vlcnum = (coeffTokens3D[1] > 10 && coeffTokens3D[2] < 3) ? 1 : 0;
 
+		for (int k = 15; k >= 0; k--)
+		{
+			if (nonZeroCoefficientsStorage[k] != 0)
+			{
+				se.value1 = nonZeroCoefficientsStorage[k];
+
+				// encode level
+				if (vlcnum == 0)
+				{
+					writeSyntaxElement_level_VLC1(&se, &outputStream);
+				}
+				else
+				{
+					writeSyntaxElement_level_VLCN(&se, vlcnum, &outputStream);
+				}
+
+				//update VLC table
+
+				if (abs(nonZeroCoefficientsStorage[k]) > incVlc[vlcnum])
+				{
+					vlcnum++;
+				}
+			}
+		}
+
+		//step 4 coding of total zeros
+		if (coeffTokens3D[1] < 16)
+		{
+			se.value1 = totalZeros[0];
+
+			vlcnum = coeffTokens3D[1] - 1;
+
+			se.len = vlcnum;
+
+			writeSyntaxElement_TotalZeros(&se, &outputStream);
+		}
+
+		//step 5 encoding run before each coefficient
+		zerosleft = totalZeros[0];
+		numcoef = coeffTokens3D[1];
+		for (int l = 0; l < 16; l++)
+		{
+			run = runBefore[l];
+
+			se.value1 = run;
+
+			// for last coeff, run is remaining totzeros
+			// when zerosleft is zero, remaining coeffs have 0 run
+			if ((!zerosleft) || (coeffTokens3D[1] <= 1))
+				break;
+			if (numcoef > 1 && zerosleft)
+			{
+				vlcnum = imin(zerosleft - 1, 6);
+				se.len = vlcnum;
+
+				writeSyntaxElement_Run(&se, &outputStream);
+
+				zerosleft -= run;
+				numcoef--;
+			}
+		}
+	}
 	cout << "FUCK U" << endl;
 
 	return bitStream;
+}
+
+int EntropyEncode::writeSyntaxElement_Run(SyntaxElement *se, Bitstream *bitstream)
+{
+	static const byte lentab[15][16] =
+	{
+		{ 1,1 },
+		{ 1,2,2 },
+		{ 2,2,2,2 },
+		{ 2,2,2,3,3 },
+		{ 2,2,3,3,3,3 },
+		{ 2,3,3,3,3,3,3 },
+		{ 3,3,3,3,3,3,3,4,5,6,7,8,9,10,11 },
+	};
+
+	static const byte codtab[15][16] =
+	{
+		{ 1,0 },
+		{ 1,1,0 },
+		{ 3,2,1,0 },
+		{ 3,2,1,1,0 },
+		{ 3,2,3,2,1,0 },
+		{ 3,0,1,3,2,5,4 },
+		{ 7,6,5,4,3,2,1,1,1,1,1,1,1,1,1 },
+	};
+
+	int vlcnum = se->len;
+
+	// se->value1 : run
+	se->len = lentab[vlcnum][se->value1];
+	se->inf = codtab[vlcnum][se->value1];
+
+	if (se->len == 0)
+	{
+		cout << "ERROR: (run) not valid" << endl;
+		exit(-1);
+	}
+
+	symbol2vlc(se);
+
+	writeUVLC2buffer(se, bitstream);
+
+	return (se->len);
+}
+
+int EntropyEncode::writeSyntaxElement_TotalZeros(SyntaxElement *se, Bitstream *bitstream)
+{
+	static const byte lentab[15][16] =
+	{
+		{ 1,3,3,4,4,5,5,6,6,7,7,8,8,9,9,9 },
+		{ 3,3,3,3,3,4,4,4,4,5,5,6,6,6,6 },
+		{ 4,3,3,3,4,4,3,3,4,5,5,6,5,6 },
+		{ 5,3,4,4,3,3,3,4,3,4,5,5,5 },
+		{ 4,4,4,3,3,3,3,3,4,5,4,5 },
+		{ 6,5,3,3,3,3,3,3,4,3,6 },
+		{ 6,5,3,3,3,2,3,4,3,6 },
+		{ 6,4,5,3,2,2,3,3,6 },
+		{ 6,6,4,2,2,3,2,5 },
+		{ 5,5,3,2,2,2,4 },
+		{ 4,4,3,3,1,3 },
+		{ 4,4,2,1,3 },
+		{ 3,3,1,2 },
+		{ 2,2,1 },
+		{ 1,1 },
+	};
+
+	static const byte codtab[15][16] =
+	{
+		{ 1,3,2,3,2,3,2,3,2,3,2,3,2,3,2,1 },
+		{ 7,6,5,4,3,5,4,3,2,3,2,3,2,1,0 },
+		{ 5,7,6,5,4,3,4,3,2,3,2,1,1,0 },
+		{ 3,7,5,4,6,5,4,3,3,2,2,1,0 },
+		{ 5,4,3,7,6,5,4,3,2,1,1,0 },
+		{ 1,1,7,6,5,4,3,2,1,1,0 },
+		{ 1,1,5,4,3,3,2,1,1,0 },
+		{ 1,1,1,3,3,2,2,1,0 },
+		{ 1,0,1,3,2,1,1,1, },
+		{ 1,0,1,3,2,1,1, },
+		{ 0,1,1,2,1,3 },
+		{ 0,1,1,1,1 },
+		{ 0,1,1,1 },
+		{ 0,1,1 },
+		{ 0,1 },
+	};
+	int vlcnum = se->len;
+
+	// se->value1 : TotalZeros
+	se->len = lentab[vlcnum][se->value1];
+	se->inf = codtab[vlcnum][se->value1];
+
+	if (se->len == 0)
+	{
+		cout << "ERROR: (TotalZeros) not valid" << endl;
+		exit(-1);
+	}
+
+	symbol2vlc(se);
+
+	writeUVLC2buffer(se, bitstream);
+
+	return (se->len);
+}
+
+int EntropyEncode::writeSyntaxElement_level_VLCN(SyntaxElement *se, int vlc, Bitstream *bitstream)
+{
+	int level = se->value1;
+	int sign = (level < 0 ? 1 : 0);
+	int levabs = abs(level) - 1;
+
+	int shift = vlc - 1;
+	int escape = (15 << shift);
+
+	if (levabs < escape)
+	{
+		int sufmask = ~((0xffffffff) << shift);
+		int suffix = (levabs)& sufmask;
+
+		se->len = ((levabs) >> shift) + 1 + vlc;
+		se->inf = (2 << shift) | (suffix << 1) | sign;
+	}
+	else
+	{
+		int iMask = 4096;
+		int levabsesc = levabs - escape + 2048;
+		int numPrefix = 0;
+
+		if ((levabsesc) >= 4096)
+		{
+			numPrefix++;
+			while ((levabsesc) >= (4096 << numPrefix))
+			{
+				numPrefix++;
+			}
+		}
+
+		iMask <<= numPrefix;
+		se->inf = iMask | ((levabsesc << 1) - iMask) | sign;
+
+		se->len = 28 + (numPrefix << 1);
+	}
+
+	symbol2vlc(se);
+
+	writeUVLC2buffer(se, bitstream);
+
+	return (se->len);
+}
+
+int EntropyEncode::writeSyntaxElement_level_VLC1(SyntaxElement *se, Bitstream *bitstream)
+{
+	int level = se->value1;
+	int sign = (level < 0 ? 1 : 0);
+	int levabs = abs(level);
+
+	if (levabs < 8)
+	{
+		se->len = levabs * 2 + sign - 1;
+		se->inf = 1;
+	}
+	else if (levabs < 16)
+	{
+		// escape code1
+		se->len = 19;
+		se->inf = 16 | ((levabs << 1) - 16) | sign;
+	}
+	else
+	{
+		int iMask = 4096, numPrefix = 0;
+		int  levabsm16 = levabs + 2032;
+
+		// escape code2
+		if ((levabsm16) >= 4096)
+		{
+			numPrefix++;
+			while ((levabsm16) >= (4096 << numPrefix))
+			{
+				numPrefix++;
+			}
+		}
+
+		iMask <<= numPrefix;
+		se->inf = iMask | ((levabsm16 << 1) - iMask) | sign;
+
+		se->len = 28 + (numPrefix << 1);
+	}
+
+	symbol2vlc(se);
+
+	writeUVLC2buffer(se, bitstream);
+
+	return (se->len);
 }
 
 int EntropyEncode::writeSyntaxElement_NumCoeffTrailingOnes(SyntaxElement *se, Bitstream *bitstream)
@@ -210,7 +491,20 @@ int EntropyEncode::writeSyntaxElement_NumCoeffTrailingOnes(SyntaxElement *se, Bi
 
 	writeUVLC2buffer(se, bitstream);
 
-	bitstream->write_flag = 1;
+	//bitstream->write_flag = 1;
+
+	return (se->len);
+}
+
+int EntropyEncode::writeSyntaxElement_VLC(SyntaxElement *se, Bitstream *bitstream)
+{
+	se->inf = se->value1;
+	se->len = se->value2;
+	symbol2vlc(se);
+
+	writeUVLC2buffer(se, bitstream);
+
+	//bitstream->write_flag = 1;
 
 	return (se->len);
 }
@@ -386,6 +680,7 @@ int * EntropyEncode::reverseLevels(float *scannedArray)
 		}
 	}
 
+	//special case
 	bool lastNonZero = false;
 	int j = 0;
 	while (!lastNonZero)
@@ -413,9 +708,9 @@ int * EntropyEncode::reverseLevels(float *scannedArray)
 	return orderedArray;
 }
 
-unsigned char * EntropyEncode::signTrailOnes(float *scannedArray)
+int * EntropyEncode::signTrailOnes(float *scannedArray)
 {
-	unsigned char tempArray[] = { 2, 2, 2 }; 
+	int tempArray[] = { 2, 2, 2 }; 
 	int oneCounter = 0;
 
 	for (int i = 15; i >= 0; i--)
@@ -453,6 +748,40 @@ unsigned char * EntropyEncode::signTrailOnes(float *scannedArray)
 		}
 	}
 	//reading a 2 will mean EOF
+
+	int len = 0;
+	int code = 0;
+
+	if (tempArray[0] != 2)
+	{
+		len++;
+		if (tempArray[0] == 1)
+		{
+			code += 4;
+		}
+	}
+
+	if (tempArray[1] != 2)
+	{
+		len++;
+		if (tempArray[1] == 1)
+		{
+			code += 2;
+		}
+	}
+
+	if (tempArray[2] != 2)
+	{
+		len++;
+		if (tempArray[2] == 1)
+		{
+			code += 1;
+		}
+	}
+
+	tempArray[0] = code;
+	tempArray[1] = len;
+
 	return tempArray;
 
 }
