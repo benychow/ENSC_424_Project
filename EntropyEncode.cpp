@@ -74,6 +74,7 @@ unsigned char * EntropyEncode::encodeVLC(float *pDCTBuf, int iWidth, int iHeight
 		{
 			xStart2 = xStart1 + j * 4; //Starting location for top left of each 4x4 dct block
 			//scannedBlock = zScan(pDCTBuf, xStart2, iWidth);
+			
 			scannedBlock[0] = 0;;
 			scannedBlock[1] = 3;
 			scannedBlock[2] = 0;
@@ -90,6 +91,7 @@ unsigned char * EntropyEncode::encodeVLC(float *pDCTBuf, int iWidth, int iHeight
 			scannedBlock[13] = 0;
 			scannedBlock[14] = 0;
 			scannedBlock[15] = 0;
+			
 
 			//count coeff tokens
 			coeffTokens = countCoeffToken(scannedBlock);
@@ -132,88 +134,98 @@ unsigned char * EntropyEncode::encodeVLC(float *pDCTBuf, int iWidth, int iHeight
 		averageN = adaptiveNumtrail(i, coeffTokens3D, iWidth,  iHeight);
 	}
 
+	coeffCounter = 0; // + 3
+	coeffCounter2 = 0; // +2
+	coeffCounter3 = 0; // +16
 
-	//step 1 coeff num and trail 1 encode
-	se.value1 = coeffTokens3D[1];
-	se.value2 = coeffTokens3D[2];
-	se.len = 0;
-
-	writeSyntaxElement_NumCoeffTrailingOnes(&se, &outputStream);
-
-	if (coeffTokens3D[1])
+	for (int z = 0; z < (iWidth / 4) * (iHeight / 4); z++)
 	{
-		//step 2 sign of trail 1 encode
-		se.value1 = signOnesStorage[0];
-		se.value2 = signOnesStorage[1];
 
-		writeSyntaxElement_VLC(&se, &outputStream);
+		//step 1 coeff num and trail 1 encode
+		se.value1 = coeffTokens3D[coeffCounter + 1];
+		se.value2 = coeffTokens3D[coeffCounter + 2];
+		se.len = 0;
 
-		//step 3 encode the remaining non-zero coeffs in reverse order
-		//decide which vlc to use
-		level_two_or_higher = (coeffTokens3D[1] > 3 && coeffTokens3D[2] == 3) ? 0 : 1;
-		vlcnum = (coeffTokens3D[1] > 10 && coeffTokens3D[2] < 3) ? 1 : 0;
+		writeSyntaxElement_NumCoeffTrailingOnes(&se, &outputStream);
 
-		for (int k = 15; k >= 0; k--)
+		if (coeffTokens3D[coeffCounter + 1])
 		{
-			if (nonZeroCoefficientsStorage[k] != 0)
+			//step 2 sign of trail 1 encode
+			se.value1 = signOnesStorage[coeffCounter2];
+			se.value2 = signOnesStorage[coeffCounter2 + 1];
+
+			writeSyntaxElement_VLC(&se, &outputStream);
+
+			//step 3 encode the remaining non-zero coeffs in reverse order
+			//decide which vlc to use
+			level_two_or_higher = (coeffTokens3D[coeffCounter + 1] > 3 && coeffTokens3D[coeffCounter + 2] == 3) ? 0 : 1;
+			vlcnum = (coeffTokens3D[coeffCounter + 1] > 10 && coeffTokens3D[coeffCounter + 2] < 3) ? 1 : 0;
+
+			for (int k = 15; k >= 0; k--)
 			{
-				se.value1 = nonZeroCoefficientsStorage[k];
-
-				// encode level
-				if (vlcnum == 0)
+				if (nonZeroCoefficientsStorage[coeffCounter3 + k] != 0)
 				{
-					writeSyntaxElement_level_VLC1(&se, &outputStream);
-				}
-				else
-				{
-					writeSyntaxElement_level_VLCN(&se, vlcnum, &outputStream);
-				}
+					se.value1 = nonZeroCoefficientsStorage[coeffCounter3 + k];
 
-				//update VLC table
+					// encode level
+					if (vlcnum == 0)
+					{
+						writeSyntaxElement_level_VLC1(&se, &outputStream);
+					}
+					else
+					{
+						writeSyntaxElement_level_VLCN(&se, vlcnum, &outputStream);
+					}
 
-				if (abs(nonZeroCoefficientsStorage[k]) > incVlc[vlcnum])
-				{
-					vlcnum++;
+					//update VLC table
+
+					if (abs(nonZeroCoefficientsStorage[coeffCounter3 + k]) > incVlc[vlcnum])
+					{
+						vlcnum++;
+					}
 				}
 			}
-		}
 
-		//step 4 coding of total zeros
-		if (coeffTokens3D[1] < 16)
-		{
-			se.value1 = totalZeros[0];
-
-			vlcnum = coeffTokens3D[1] - 1;
-
-			se.len = vlcnum;
-
-			writeSyntaxElement_TotalZeros(&se, &outputStream);
-		}
-
-		//step 5 encoding run before each coefficient
-		zerosleft = totalZeros[0];
-		numcoef = coeffTokens3D[1];
-		for (int l = 0; l < 16; l++)
-		{
-			run = runBefore[l];
-
-			se.value1 = run;
-
-			// for last coeff, run is remaining totzeros
-			// when zerosleft is zero, remaining coeffs have 0 run
-			if ((!zerosleft) || (coeffTokens3D[1] <= 1))
-				break;
-			if (numcoef > 1 && zerosleft)
+			//step 4 coding of total zeros
+			if (coeffTokens3D[coeffCounter + 1] < 16)
 			{
-				vlcnum = imin(zerosleft - 1, 6);
+				se.value1 = totalZeros[z];
+
+				vlcnum = coeffTokens3D[coeffCounter + 1] - 1;
+
 				se.len = vlcnum;
 
-				writeSyntaxElement_Run(&se, &outputStream);
+				writeSyntaxElement_TotalZeros(&se, &outputStream);
+			}
 
-				zerosleft -= run;
-				numcoef--;
+			//step 5 encoding run before each coefficient
+			zerosleft = totalZeros[z];
+			numcoef = coeffTokens3D[coeffCounter + 1];
+			for (int l = 0; l < 16; l++)
+			{
+				run = runBefore[l];
+
+				se.value1 = run;
+
+				// for last coeff, run is remaining totzeros
+				// when zerosleft is zero, remaining coeffs have 0 run
+				if ((!zerosleft) || (coeffTokens3D[coeffCounter + 1] <= 1))
+					break;
+				if (numcoef > 1 && zerosleft)
+				{
+					vlcnum = imin(zerosleft - 1, 6);
+					se.len = vlcnum;
+
+					writeSyntaxElement_Run(&se, &outputStream);
+
+					zerosleft -= run;
+					numcoef--;
+				}
 			}
 		}
+		coeffCounter += 3;
+		coeffCounter2 += 2;
+		coeffCounter3 += 16;
 	}
 	cout << "END TEST" << endl;
 
