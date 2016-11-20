@@ -215,7 +215,7 @@ unsigned char * EntropyEncode::encodeVLC(float *pDCTBuf, int iWidth, int iHeight
 			}
 		}
 	}
-	cout << "FUCK U" << endl;
+	cout << "END TEST" << endl;
 
 	return bitStream;
 }
