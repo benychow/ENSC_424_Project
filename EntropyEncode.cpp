@@ -73,16 +73,18 @@ unsigned char * EntropyEncode::encodeVLC(float *pDCTBuf, int iWidth, int iHeight
 		for (int j = 0; j < (iWidth / 4); j++)
 		{
 			xStart2 = xStart1 + j * 4; //Starting location for top left of each 4x4 dct block
-			//scannedBlock = zScan(pDCTBuf, xStart2, iWidth);
+
+			scannedBlock = zScan(pDCTBuf, xStart2, iWidth);
 			
-			scannedBlock[0] = 0;
-			scannedBlock[1] = 3;
-			scannedBlock[2] = 0;
-			scannedBlock[3] = 1;
-			scannedBlock[4] = -1;
-			scannedBlock[5] = -1;
-			scannedBlock[6] = 0;
-			scannedBlock[7] = 1;
+			/*
+			scannedBlock[0] = -2;
+			scannedBlock[1] = 4;
+			scannedBlock[2] = 3;
+			scannedBlock[3] = -3;
+			scannedBlock[4] = 0;
+			scannedBlock[5] = 0;
+			scannedBlock[6] = -1;
+			scannedBlock[7] = 0;
 			scannedBlock[8] = 0;
 			scannedBlock[9] = 0;
 			scannedBlock[10] = 0;
@@ -91,9 +93,8 @@ unsigned char * EntropyEncode::encodeVLC(float *pDCTBuf, int iWidth, int iHeight
 			scannedBlock[13] = 0;
 			scannedBlock[14] = 0;
 			scannedBlock[15] = 0;
+			*/
 			
-			
-
 			//count coeff tokens
 			coeffTokens = countCoeffToken(scannedBlock);
 			//store the coeff tokens in 3d array
@@ -112,6 +113,7 @@ unsigned char * EntropyEncode::encodeVLC(float *pDCTBuf, int iWidth, int iHeight
 			for (int k = 0; k < 16; k++)
 			{
 				nonZeroCoefficientsStorage[coeffCounter2 + k] = nonZeroCoefficients[k];
+
 			}
 
 			//store total zeros
@@ -227,6 +229,7 @@ unsigned char * EntropyEncode::encodeVLC(float *pDCTBuf, int iWidth, int iHeight
 	writeVlcByteAlign(&outputStream);
 
 	*sizeVLCBuf = outputStream.byte_pos;
+
 	return outputStream.streamBuffer;
 }
 
@@ -700,31 +703,37 @@ int * EntropyEncode::reverseLevels(float *scannedArray)
 			}
 		}
 	}
-
-	//special case
-	bool lastNonZero = false;
-	int j = 0;
-	while (!lastNonZero)
+	//if no 1s abort
+	if (oneCounter == 3)
 	{
-		if (tempArray[j] == 0)
+		return tempArray;
+	}
+	else
+	{
+		//special case
+		bool lastNonZero = false;
+		int j = 0;
+		while (!lastNonZero)
 		{
-			lastNonZero = true;
+			if (tempArray[j] == 0)
+			{
+				lastNonZero = true;
+			}
+			else
+			{
+				j++;
+			}
 		}
-		else
+
+		for (int k = 0; k < 15; k++)
 		{
-			j++;
+			if (j > 0)
+			{
+				orderedArray[k] = tempArray[j - 1];
+				j--;
+			}
 		}
 	}
-
-	for (int k = 0; k < 15; k++)
-	{
-		if (j > 0)
-		{
-			orderedArray[k] = tempArray[j - 1];
-			j--;
-		}
-	}
-
 
 	return orderedArray;
 }
