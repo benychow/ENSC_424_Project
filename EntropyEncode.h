@@ -40,7 +40,7 @@ public:
 	EntropyEncode(void);
 	~EntropyEncode(void);
 
-	unsigned char *encodeVLC(float *pDCTBuf, int iWidth, int iHeight);
+	unsigned char *encodeVLC(float *pDCTBuf, int iWidth, int iHeight, int *sizeVLCBuf);
 	float *zScan(float *, int xStart, int iWidth);
 	int * countCoeffToken(float *scannedBlock);
 	int adaptiveNumtrail(int xStart, int *coeffTokens3D, int iWidth, int iHeight);
