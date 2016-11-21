@@ -120,6 +120,7 @@ int main(int argc, char **argv) {
 	float fQstep;
 	int iQMtd = 0; //default DZone quantizer
 	int entType = 0; //default no entropy coding
+	unsigned char *bitOutBuf;
 
 	if (argc < 6) {
 		usage();
@@ -197,6 +198,12 @@ int main(int argc, char **argv) {
 
 		ifsInfile.close();
 		ofsOutfile.close();
+
+		delete pEncoder;
+		delete pcImgBuf;
+
+		return 0;
+
 	}
 	else if (entType == 1)
 	{
@@ -230,31 +237,29 @@ int main(int argc, char **argv) {
 	}
 	else
 	{
-		int *sizeVLCBuf = new int (sizeof(int));
-		unsigned char *bitOutBuf;
-
 		cout << "CAVLC entropy coding is used" << endl;
 
-		ofsOutfile.write((const char *)&iWidth, sizeof(int));
-		ofsOutfile.write((const char *)&iHeight, sizeof(int));
-		ofsOutfile.write((const char *)&fQstep, sizeof(float));
-		ofsOutfile.write((const char *)&iQMtd, sizeof(int));
+		//write output file with a simple header
+		//ofsOutfile.write((const char *)&iWidth, sizeof(int));
+		//ofsOutfile.write((const char *)&iHeight, sizeof(int));
+		//ofsOutfile.write((const char *)&fQstep, sizeof(float));
+		//ofsOutfile.write((const char *)&iQMtd, sizeof(int));
 
-		EntropyEncode *vlcencode = new EntropyEncode();
-		bitOutBuf = vlcencode ->encodeVLC(pDCTBuf, iWidth, iHeight, sizeVLCBuf);
+		EntropyEncode *savage = new EntropyEncode();
+		bitOutBuf = savage->encodeVLC(pDCTBuf, iWidth, iHeight);
 
-		cout << *sizeVLCBuf - 1 << endl;
-
-		ofsOutfile.write((const char *)bitOutBuf, *sizeVLCBuf);
+		//ofsOutfile.write((const char *)pDCTBuf, iImageArea * sizeof(float));
+		cout << "HAPPY THOUGHTS" << endl;
 
 		ifsInfile.close();
 		ofsOutfile.close();
 
+		delete pEncoder;
+		delete pcImgBuf;
+
+		return 2;
+
 	}
 
 
-    delete pEncoder;
-    delete pcImgBuf;
-
-    return 0;
 }
