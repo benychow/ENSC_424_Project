@@ -1,6 +1,13 @@
 ﻿C:\Program Files (x86)\MSBuild\Microsoft.Cpp\v4.0\V140\Microsoft.CppBuild.targets(392,5): warning MSB8028: The intermediate directory (.\Debug\) contains files shared from another project (acdec.vcxproj, psnr.vcxproj).  This can lead to incorrect clean and rebuild behavior.
-  acenc.cpp
-e:\documents\sfu\ensc 424\hw2\ensc_424_project\acenc.cpp(206): warning C4101: 'loc': unreferenced local variable
+<<<<<<< HEAD
+  EntropyEncode.cpp
+e:\documents\sfu\ensc 424\hw2\ensc_424_project\entropyencode.cpp(712): warning C4244: '=': conversion from 'float' to 'int', possible loss of data
+e:\documents\sfu\ensc 424\hw2\ensc_424_project\entropyencode.cpp(743): warning C4172: returning address of local variable or temporary: orderedArray
+e:\documents\sfu\ensc 424\hw2\ensc_424_project\entropyencode.cpp(831): warning C4172: returning address of local variable or temporary: tempArray
+e:\documents\sfu\ensc 424\hw2\ensc_424_project\entropyencode.cpp(926): warning C4172: returning address of local variable or temporary: scannedArray
+e:\documents\sfu\ensc 424\hw2\ensc_424_project\entropyencode.cpp(957): warning C4172: returning address of local variable or temporary: coeffTokens
 acenc.obj : warning LNK4075: ignoring '/EDITANDCONTINUE' due to '/OPT:LBR' specification
+=======
+>>>>>>> parent of 8e4adce... Reverted to last working copy
   acenc.vcxproj -> E:\Documents\sfu\ENSC 424\HW2\ENSC_424_Project\.\Debug\acenc.exe
   acenc.vcxproj -> .\Debug/acenc.pdb (Full PDB)
