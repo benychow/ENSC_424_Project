@@ -21,7 +21,7 @@ EntropyEncode::~EntropyEncode(void)
 {
 }
 
-unsigned char * EntropyEncode::encodeVLC(float *pDCTBuf, int iWidth, int iHeight, int *sizeVLCBuf)
+unsigned char * EntropyEncode::encodeVLC(float *pDCTBuf, int iWidth, int iHeight)
 {
 	unsigned char *bitStream;	//will be the output bitstream
 	bitStream = new unsigned char[2];
@@ -73,9 +73,10 @@ unsigned char * EntropyEncode::encodeVLC(float *pDCTBuf, int iWidth, int iHeight
 		for (int j = 0; j < (iWidth / 4); j++)
 		{
 			xStart2 = xStart1 + j * 4; //Starting location for top left of each 4x4 dct block
-			//scannedBlock = zScan(pDCTBuf, xStart2, iWidth);
+			scannedBlock = zScan(pDCTBuf, xStart2, iWidth);
 			
-			scannedBlock[0] = 0;
+			/*
+			scannedBlock[0] = 0;;
 			scannedBlock[1] = 3;
 			scannedBlock[2] = 0;
 			scannedBlock[3] = 1;
@@ -91,6 +92,7 @@ unsigned char * EntropyEncode::encodeVLC(float *pDCTBuf, int iWidth, int iHeight
 			scannedBlock[13] = 0;
 			scannedBlock[14] = 0;
 			scannedBlock[15] = 0;
+			*/
 			
 			
 
@@ -226,8 +228,9 @@ unsigned char * EntropyEncode::encodeVLC(float *pDCTBuf, int iWidth, int iHeight
 
 	writeVlcByteAlign(&outputStream);
 
-	*sizeVLCBuf = outputStream.byte_pos;
-	return outputStream.streamBuffer;
+	cout << "END TEST" << endl;
+
+	return bitStream;
 }
 
 // pads the rest of the bitstream with 0 for the current byte
@@ -733,7 +736,6 @@ int * EntropyEncode::signTrailOnes(float *scannedArray)
 {
 	int tempArray[] = { 2, 2, 2 }; 
 	int oneCounter = 0;
-	int len = 0;
 
 	for (int i = 15; i >= 0; i--)
 	{
@@ -746,13 +748,11 @@ int * EntropyEncode::signTrailOnes(float *scannedArray)
 					//if scanned in reverse order zig zag is 1, 0 for positive
 					tempArray[oneCounter] = 0;
 					oneCounter++;
-					len++;
 				}
 				else if (scannedArray[i] == -1)
 				{
 					tempArray[oneCounter] = 1;
 					oneCounter++;
-					len++;
 				}
 				else if (abs(scannedArray[i]) != 1) //special case
 				{
@@ -773,38 +773,30 @@ int * EntropyEncode::signTrailOnes(float *scannedArray)
 	}
 	//reading a 2 will mean EOF
 
-	
+	int len = 0;
 	int code = 0;
 
-	if (len == 0)
+	if (tempArray[0] != 2)
 	{
-		code = 0;
-	}
-	else if (len == 1 && tempArray[0] == 1)
-	{
-		code = 1;
-	}
-	else if (len == 2)
-	{
-		if (tempArray[0] == 1)
-		{
-			code += 2;
-		}
-		if (tempArray[1] == 1)
-		{
-			code += 1;
-		}
-	}
-	else if (len == 3)
-	{
+		len++;
 		if (tempArray[0] == 1)
 		{
 			code += 4;
 		}
+	}
+
+	if (tempArray[1] != 2)
+	{
+		len++;
 		if (tempArray[1] == 1)
 		{
 			code += 2;
 		}
+	}
+
+	if (tempArray[2] != 2)
+	{
+		len++;
 		if (tempArray[2] == 1)
 		{
 			code += 1;
