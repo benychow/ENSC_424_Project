@@ -73,8 +73,9 @@ unsigned char * EntropyEncode::encodeVLC(float *pDCTBuf, int iWidth, int iHeight
 		for (int j = 0; j < (iWidth / 4); j++)
 		{
 			xStart2 = xStart1 + j * 4; //Starting location for top left of each 4x4 dct block
-			//scannedBlock = zScan(pDCTBuf, xStart2, iWidth);
+			scannedBlock = zScan(pDCTBuf, xStart2, iWidth);
 			
+			/*
 			scannedBlock[0] = 0;;
 			scannedBlock[1] = 3;
 			scannedBlock[2] = 0;
@@ -91,6 +92,8 @@ unsigned char * EntropyEncode::encodeVLC(float *pDCTBuf, int iWidth, int iHeight
 			scannedBlock[13] = 0;
 			scannedBlock[14] = 0;
 			scannedBlock[15] = 0;
+			*/
+			
 			
 
 			//count coeff tokens
@@ -126,25 +129,20 @@ unsigned char * EntropyEncode::encodeVLC(float *pDCTBuf, int iWidth, int iHeight
 		}
 	}
 
-	//Adaptive coding of numtrail
-	//Obtain the average TC
-	for (int i = 0; i < ((iWidth / 4) * (iHeight / 4) * 3); i = i + 3)
-	{
-		//pass in the  starting location and TC into function to return the average N
-		averageN = adaptiveNumtrail(i, coeffTokens3D, iWidth,  iHeight);
-	}
-
 	coeffCounter = 0; // + 3
 	coeffCounter2 = 0; // +2
 	coeffCounter3 = 0; // +16
 
 	for (int z = 0; z < (iWidth / 4) * (iHeight / 4); z++)
 	{
+		//Adaptive coding of numtrail by p assing in the starting location and TC array
+		//returns average N
+		averageN = adaptiveNumtrail(coeffCounter, coeffTokens3D, iWidth, iHeight);
 
 		//step 1 coeff num and trail 1 encode
 		se.value1 = coeffTokens3D[coeffCounter + 1];
 		se.value2 = coeffTokens3D[coeffCounter + 2];
-		se.len = 0;
+		se.len = averageN;
 
 		writeSyntaxElement_NumCoeffTrailingOnes(&se, &outputStream);
 
@@ -227,9 +225,23 @@ unsigned char * EntropyEncode::encodeVLC(float *pDCTBuf, int iWidth, int iHeight
 		coeffCounter2 += 2;
 		coeffCounter3 += 16;
 	}
+
+	writeVlcByteAlign(&outputStream);
+
 	cout << "END TEST" << endl;
 
 	return bitStream;
+}
+
+// pads the rest of the bitstream with 0 for the current byte
+void EntropyEncode::writeVlcByteAlign(Bitstream *currStream)
+{
+	if (currStream->bits_to_go < 8)
+	{
+		currStream->byte_buf = (byte)((currStream->byte_buf << currStream->bits_to_go) | (0xff >> (8 - currStream->bits_to_go)));
+		currStream->streamBuffer[currStream->byte_pos++] = currStream->byte_buf;
+		currStream->bits_to_go = 8;
+	}
 }
 
 int EntropyEncode::writeSyntaxElement_Run(SyntaxElement *se, Bitstream *bitstream)
@@ -809,15 +821,24 @@ int EntropyEncode::adaptiveNumtrail(int xStart, int *coeffTokens3D, int iWidth, 
 
 	if (xStart <= topRowLength)
 	{
-		//top row cases, not adaptive needed, send back VLC0 case
-		averageN = 0;
-		return averageN;
+		//top row cases, adaptive is value on left
+		//if first block, use vlcnum = 0
+		if (xStart == 0)
+		{
+			averageN = 0;
+			return averageN;
+		}
+		else
+		{
+			//averageN is left N
+			averageN = coeffTokens3D[xStart - 2];
+		}
+
 	}
 	else if (xStart % leftColHeight == 0)
 	{
-		//left most case, no adaptive needed, send back VLC0 case
-		averageN = 0;
-		return averageN;
+		//left most case, adaptive is value on top
+		averageN = coeffTokens3D[xStart - leftColHeight + 1];
 	}
 	else
 	{
@@ -825,7 +846,36 @@ int EntropyEncode::adaptiveNumtrail(int xStart, int *coeffTokens3D, int iWidth, 
 		topN = coeffTokens3D[xStart - leftColHeight + 1];
 
 		averageN = (leftN + topN) / 2;
+	}
+
+	if (averageN >= 0 && averageN < 2)
+	{
+		//use table 0
+		averageN = 0;
 		return averageN;
+	}
+	else if (averageN >= 2 && averageN < 4)
+	{
+		//use table 1 
+		averageN = 1;
+		return averageN;
+	}
+	else if (averageN >= 4 && averageN < 8)
+	{
+		//use table 2
+		averageN = 2;
+		return averageN;
+	}
+	else if (averageN >= 8)
+	{
+		//use FLC
+		averageN = 3;
+		return averageN;
+	}
+	else
+	{
+		cout << "ERROR in calculating average N" << endl;
+		return 1;
 	}
 }
 

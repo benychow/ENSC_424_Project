@@ -56,6 +56,7 @@ public:
 	int writeSyntaxElement_level_VLCN(SyntaxElement *se, int vlc, Bitstream *bitstream);
 	int writeSyntaxElement_TotalZeros(SyntaxElement *se, Bitstream *bitstream);
 	int writeSyntaxElement_Run(SyntaxElement *se, Bitstream *bitstream);
+	void writeVlcByteAlign(Bitstream *currStream);
 
 
 private:
