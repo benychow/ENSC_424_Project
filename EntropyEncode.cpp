@@ -93,8 +93,6 @@ unsigned char * EntropyEncode::encodeVLC(float *pDCTBuf, int iWidth, int iHeight
 			scannedBlock[14] = 0;
 			scannedBlock[15] = 0;
 			*/
-			
-			
 
 			//count coeff tokens
 			coeffTokens = countCoeffToken(scannedBlock);
@@ -687,47 +685,69 @@ int * EntropyEncode::reverseLevels(float *scannedArray)
 	int oneCounter = 3; //if the one is part of the trailing 1s, do not include
 	int arrayCounter = 0;
 
+	int t1Counter = 0;
+	int t1Location = 0;
+	int coefLocation = 0;
+
+	for (int e = 0; e < 16; e++)
+	{
+		tempArray[e] = scannedArray[e];
+	}
+
+	//find special case first
+	//first count # of trailing ones
+	for (int i = 0; i < 16; i++)
+	{
+		if (abs(tempArray[i]) == 1)
+			t1Counter++;
+	}
+
+	//if # trailing 1 is less than 3, next non-zero coeff must be >1 or < -1
+	if (t1Counter < 3)
+	{
+		//find where t he  1 is located
+		for (int j = 0; j < 16; j++)
+		{
+			if (abs(tempArray[j]) == 1)
+			{
+				t1Location = j;
+				j = 16;
+			}
+		}
+
+		//location of coeff before t1Location
+		for (int k = t1Location; k >= 0; k--)
+		{
+			if (tempArray[k] != 0 && abs(tempArray[k]) != 1)
+			{
+				if (tempArray[k] > 0)
+				{
+					tempArray[k] = tempArray[k] - 1;
+				}
+				else if (tempArray[k] < 0)
+				{
+					tempArray[k] = tempArray[k] + 1;
+				}
+			}
+		}
+	}
+
 	for (int i = 15; i >= 0; i--)
 	{
-		if (scannedArray[i] != 0) //if the value is a non-zero coefficient
+		if (tempArray[i] != 0) //if the value is a non-zero coefficient
 		{
-			if (abs(scannedArray[i]) == 1 && oneCounter > 0)
+			if (abs(tempArray[i]) == 1 && oneCounter > 0)
 			{
 				//ignore this and subtract oneCounter
 				oneCounter--;
 			}
 			else
 			{
-				tempArray[arrayCounter] = scannedArray[i]; 
+				orderedArray[arrayCounter] = tempArray[i];
 				arrayCounter++;
 			}
 		}
 	}
-
-	//special case
-	bool lastNonZero = false;
-	int j = 0;
-	while (!lastNonZero)
-	{
-		if (tempArray[j] == 0)
-		{
-			lastNonZero = true;
-		}
-		else
-		{
-			j++;
-		}
-	}
-
-	for (int k = 0; k < 15; k++)
-	{
-		if (j > 0)
-		{
-			orderedArray[k] = tempArray[j - 1];
-			j--;
-		}
-	}
-
 
 	return orderedArray;
 }
