@@ -33,7 +33,7 @@ void usage() {
     cout << "    qstep:      Quantization step size (can be floating-point)" << endl;
     cout << "    qmtd:       Quantization method. 0 for deadzone quantizer (default). 1 for midtread quantizer. " << endl;
 	cout << "			     If qmtd is not specified, it will be treated as 0." << endl;
-	cout << "	 encType;	 Type of entropy coding used. 0 is none. 1 is Huffman (not yet implemented). 2 is CAVLC" << endl;
+	cout << "	 encType;	 Type of entropy coding used. 0 is none. 1 is Huffman. 2 is CAVLC" << endl;
 }
 
 
@@ -212,6 +212,8 @@ int main(int argc, char **argv) {
 		float prob[256];
 		int loc[256];
 		int i;
+		unsigned int *code;
+		char *length;
 
 		for (i = 0; i < 256; i++) {
 			prob[i] = 0;
@@ -230,6 +232,14 @@ int main(int argc, char **argv) {
 		}
 
 		//Huffman codeword and length buffers
+		code = new unsigned int[sizeof(unsigned int)];
+		length = new char[sizeof(char)];
+
+		for (i = 0; i < 256; i++)
+		{
+			code[i] = 0;
+			length[i] = 0;
+		}
 
 		//generate Huffman codewords
 		//sort(prob, loc, 256);
