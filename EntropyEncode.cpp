@@ -21,7 +21,7 @@ EntropyEncode::~EntropyEncode(void)
 {
 }
 
-unsigned char * EntropyEncode::encodeVLC(float *pDCTBuf, int iWidth, int iHeight)
+unsigned char * EntropyEncode::encodeVLC(float *pDCTBuf, int iWidth, int iHeight, int *sizeVLCBuf)
 {
 	unsigned char *bitStream;	//will be the output bitstream
 	bitStream = new unsigned char[2];
@@ -73,7 +73,6 @@ unsigned char * EntropyEncode::encodeVLC(float *pDCTBuf, int iWidth, int iHeight
 		for (int j = 0; j < (iWidth / 4); j++)
 		{
 			xStart2 = xStart1 + j * 4; //Starting location for top left of each 4x4 dct block
-<<<<<<< HEAD
 
 			scannedBlock = zScan(pDCTBuf, xStart2, iWidth);
 			
@@ -86,23 +85,6 @@ unsigned char * EntropyEncode::encodeVLC(float *pDCTBuf, int iWidth, int iHeight
 			scannedBlock[5] = 0;
 			scannedBlock[6] = -1;
 			scannedBlock[7] = 0;
-=======
-			scannedBlock = zScan(pDCTBuf, xStart2, iWidth);
-			
-			/*
-<<<<<<< HEAD
-			scannedBlock[0] = 0;
-=======
-			scannedBlock[0] = 0;;
->>>>>>> parent of 8e4adce... Reverted to last working copy
-			scannedBlock[1] = 3;
-			scannedBlock[2] = 0;
-			scannedBlock[3] = 1;
-			scannedBlock[4] = -1;
-			scannedBlock[5] = -1;
-			scannedBlock[6] = 0;
-			scannedBlock[7] = 1;
->>>>>>> origin/master
 			scannedBlock[8] = 0;
 			scannedBlock[9] = 0;
 			scannedBlock[10] = 0;
@@ -112,16 +94,7 @@ unsigned char * EntropyEncode::encodeVLC(float *pDCTBuf, int iWidth, int iHeight
 			scannedBlock[14] = 0;
 			scannedBlock[15] = 0;
 			*/
-<<<<<<< HEAD
 			
-=======
-<<<<<<< HEAD
-			
-			
-=======
->>>>>>> parent of 8e4adce... Reverted to last working copy
-
->>>>>>> origin/master
 			//count coeff tokens
 			coeffTokens = countCoeffToken(scannedBlock);
 			//store the coeff tokens in 3d array
@@ -191,6 +164,7 @@ unsigned char * EntropyEncode::encodeVLC(float *pDCTBuf, int iWidth, int iHeight
 				if (nonZeroCoefficientsStorage[coeffCounter3 + k] != 0)
 				{
 					se.value1 = nonZeroCoefficientsStorage[coeffCounter3 + k];
+
 					// encode level
 					if (vlcnum == 0)
 					{
@@ -254,28 +228,9 @@ unsigned char * EntropyEncode::encodeVLC(float *pDCTBuf, int iWidth, int iHeight
 
 	writeVlcByteAlign(&outputStream);
 
-<<<<<<< HEAD
 	*sizeVLCBuf = outputStream.byte_pos;
 
-<<<<<<< HEAD
-=======
-	delete[] coeffTokens;
-	delete[] coeffTokens3D;
-	delete[] signOnes;
-	delete[] signOnesStorage;
-	delete[] nonZeroCoefficients;
-	delete[] nonZeroCoefficientsStorage;
-	delete[] totalZeros;
-	delete[] zeroLeft;
-	delete[] runBefore;
-
->>>>>>> origin/master
 	return outputStream.streamBuffer;
-=======
-	cout << "END TEST" << endl;
-
-	return bitStream;
->>>>>>> parent of 8e4adce... Reverted to last working copy
 }
 
 // pads the rest of the bitstream with 0 for the current byte
@@ -732,15 +687,22 @@ int * EntropyEncode::reverseLevels(float *scannedArray)
 	int oneCounter = 3; //if the one is part of the trailing 1s, do not include
 	int arrayCounter = 0;
 
-	int t1Counter = 0;
-	int t1Location = 0;
-	int coefLocation = 0;
-
-	for (int e = 0; e < 16; e++)
+	for (int i = 15; i >= 0; i--)
 	{
-		tempArray[e] = scannedArray[e];
+		if (scannedArray[i] != 0) //if the value is a non-zero coefficient
+		{
+			if (abs(scannedArray[i]) == 1 && oneCounter > 0)
+			{
+				//ignore this and subtract oneCounter
+				oneCounter--;
+			}
+			else
+			{
+				tempArray[arrayCounter] = scannedArray[i]; 
+				arrayCounter++;
+			}
+		}
 	}
-<<<<<<< HEAD
 	//if no 1s abort
 	if (oneCounter == 3)
 	{
@@ -760,68 +722,15 @@ int * EntropyEncode::reverseLevels(float *scannedArray)
 			else
 			{
 				j++;
-=======
-
-	//find special case first
-	//first count # of trailing ones
-	for (int i = 0; i < 16; i++)
-	{
-		if (abs(tempArray[i]) == 1)
-			t1Counter++;
-	}
-
-	//if # trailing 1 is less than 3, next non-zero coeff must be >1 or < -1
-	if (t1Counter < 3)
-	{
-		//find where t he  1 is located
-		for (int j = 0; j < 16; j++)
-		{
-			if (abs(tempArray[j]) == 1)
-			{
-				t1Location = j;
-				j = 16;
 			}
 		}
 
-		//location of coeff before t1Location
-		for (int k = t1Location; k >= 0; k--)
-		{
-			if (tempArray[k] != 0 && abs(tempArray[k]) != 1)
-			{
-				if (tempArray[k] > 0)
-				{
-					tempArray[k] = tempArray[k] - 1;
-				}
-				else if (tempArray[k] < 0)
-				{
-					tempArray[k] = tempArray[k] + 1;
-				}
->>>>>>> origin/master
-			}
-		}
-
-<<<<<<< HEAD
 		for (int k = 0; k < 15; k++)
 		{
 			if (j > 0)
 			{
 				orderedArray[k] = tempArray[j - 1];
 				j--;
-=======
-	for (int i = 15; i >= 0; i--)
-	{
-		if (tempArray[i] != 0) //if the value is a non-zero coefficient
-		{
-			if (abs(tempArray[i]) == 1 && oneCounter > 0)
-			{
-				//ignore this and subtract oneCounter
-				oneCounter--;
-			}
-			else
-			{
-				orderedArray[arrayCounter] = tempArray[i];
-				arrayCounter++;
->>>>>>> origin/master
 			}
 		}
 	}
@@ -833,6 +742,7 @@ int * EntropyEncode::signTrailOnes(float *scannedArray)
 {
 	int tempArray[] = { 2, 2, 2 }; 
 	int oneCounter = 0;
+	int len = 0;
 
 	for (int i = 15; i >= 0; i--)
 	{
@@ -845,11 +755,13 @@ int * EntropyEncode::signTrailOnes(float *scannedArray)
 					//if scanned in reverse order zig zag is 1, 0 for positive
 					tempArray[oneCounter] = 0;
 					oneCounter++;
+					len++;
 				}
 				else if (scannedArray[i] == -1)
 				{
 					tempArray[oneCounter] = 1;
 					oneCounter++;
+					len++;
 				}
 				else if (abs(scannedArray[i]) != 1) //special case
 				{
@@ -870,30 +782,38 @@ int * EntropyEncode::signTrailOnes(float *scannedArray)
 	}
 	//reading a 2 will mean EOF
 
-	int len = 0;
+	
 	int code = 0;
 
-	if (tempArray[0] != 2)
+	if (len == 0)
 	{
-		len++;
+		code = 0;
+	}
+	else if (len == 1 && tempArray[0] == 1)
+	{
+		code = 1;
+	}
+	else if (len == 2)
+	{
+		if (tempArray[0] == 1)
+		{
+			code += 2;
+		}
+		if (tempArray[1] == 1)
+		{
+			code += 1;
+		}
+	}
+	else if (len == 3)
+	{
 		if (tempArray[0] == 1)
 		{
 			code += 4;
 		}
-	}
-
-	if (tempArray[1] != 2)
-	{
-		len++;
 		if (tempArray[1] == 1)
 		{
 			code += 2;
 		}
-	}
-
-	if (tempArray[2] != 2)
-	{
-		len++;
 		if (tempArray[2] == 1)
 		{
 			code += 1;
@@ -978,7 +898,8 @@ int EntropyEncode::adaptiveNumtrail(int xStart, int *coeffTokens3D, int iWidth, 
 
 float * EntropyEncode::zScan(float *pDCTBuf, int xStart, int iWidth)
 {
-	float scannedArray[16];
+	float *scannedArray;
+	scannedArray = new float[16];
 
 	//perform zig zag scan
 	scannedArray[0] = pDCTBuf[xStart];
@@ -1003,8 +924,8 @@ float * EntropyEncode::zScan(float *pDCTBuf, int xStart, int iWidth)
 
 int * EntropyEncode::countCoeffToken(float *scannedBlock)
 {
-	int coeffTokens[2];
-	//0 stores TC, 1 stores T1s
+	int *coeffTokens;
+	coeffTokens = new int[2]; //0 stores TC, 1 stores T1s
 	int coeffCounter = 0;
 	int oneCounter = 0;
 

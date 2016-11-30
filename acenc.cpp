@@ -33,7 +33,7 @@ void usage() {
     cout << "    qstep:      Quantization step size (can be floating-point)" << endl;
     cout << "    qmtd:       Quantization method. 0 for deadzone quantizer (default). 1 for midtread quantizer. " << endl;
 	cout << "			     If qmtd is not specified, it will be treated as 0." << endl;
-	cout << "	 encType;	 Type of entropy coding used. 0 is none. 1 is Huffman. 2 is CAVLC" << endl;
+	cout << "	 encType;	 Type of entropy coding used. 0 is none. 1 is Huffman (not yet implemented). 2 is CAVLC" << endl;
 }
 
 
@@ -120,7 +120,6 @@ int main(int argc, char **argv) {
 	float fQstep;
 	int iQMtd = 0; //default DZone quantizer
 	int entType = 0; //default no entropy coding
-	unsigned char *bitOutBuf;
 
 	if (argc < 6) {
 		usage();
@@ -198,12 +197,6 @@ int main(int argc, char **argv) {
 
 		ifsInfile.close();
 		ofsOutfile.close();
-
-		delete pEncoder;
-		delete pcImgBuf;
-
-		return 0;
-
 	}
 	else if (entType == 1)
 	{
@@ -212,8 +205,6 @@ int main(int argc, char **argv) {
 		float prob[256];
 		int loc[256];
 		int i;
-		unsigned int *code;
-		char *length;
 
 		for (i = 0; i < 256; i++) {
 			prob[i] = 0;
@@ -232,14 +223,6 @@ int main(int argc, char **argv) {
 		}
 
 		//Huffman codeword and length buffers
-		code = new unsigned int[sizeof(unsigned int)];
-		length = new char[sizeof(char)];
-
-		for (i = 0; i < 256; i++)
-		{
-			code[i] = 0;
-			length[i] = 0;
-		}
 
 		//generate Huffman codewords
 		//sort(prob, loc, 256);
@@ -247,29 +230,31 @@ int main(int argc, char **argv) {
 	}
 	else
 	{
+		int *sizeVLCBuf = new int (sizeof(int));
+		unsigned char *bitOutBuf;
+
 		cout << "CAVLC entropy coding is used" << endl;
 
-		//write output file with a simple header
-		//ofsOutfile.write((const char *)&iWidth, sizeof(int));
-		//ofsOutfile.write((const char *)&iHeight, sizeof(int));
-		//ofsOutfile.write((const char *)&fQstep, sizeof(float));
-		//ofsOutfile.write((const char *)&iQMtd, sizeof(int));
+		ofsOutfile.write((const char *)&iWidth, sizeof(int));
+		ofsOutfile.write((const char *)&iHeight, sizeof(int));
+		ofsOutfile.write((const char *)&fQstep, sizeof(float));
+		ofsOutfile.write((const char *)&iQMtd, sizeof(int));
 
-		EntropyEncode *savage = new EntropyEncode();
-		bitOutBuf = savage->encodeVLC(pDCTBuf, iWidth, iHeight);
+		EntropyEncode *vlcencode = new EntropyEncode();
+		bitOutBuf = vlcencode ->encodeVLC(pDCTBuf, iWidth, iHeight, sizeVLCBuf);
 
-		//ofsOutfile.write((const char *)pDCTBuf, iImageArea * sizeof(float));
-		cout << "HAPPY THOUGHTS" << endl;
+		cout << *sizeVLCBuf - 1 << endl;
+
+		ofsOutfile.write((const char *)bitOutBuf, *sizeVLCBuf);
 
 		ifsInfile.close();
 		ofsOutfile.close();
 
-		delete pEncoder;
-		delete pcImgBuf;
-
-		return 2;
-
 	}
 
 
+    delete pEncoder;
+    delete pcImgBuf;
+
+    return 0;
 }
