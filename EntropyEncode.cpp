@@ -74,17 +74,16 @@ unsigned char * EntropyEncode::encodeVLC(float *pDCTBuf, int iWidth, int iHeight
 		{
 			xStart2 = xStart1 + j * 4; //Starting location for top left of each 4x4 dct block
 
-			scannedBlock = zScan(pDCTBuf, xStart2, iWidth);
+			//scannedBlock = zScan(pDCTBuf, xStart2, iWidth);
 			
-			/*
-			scannedBlock[0] = -2;
-			scannedBlock[1] = 4;
-			scannedBlock[2] = 3;
-			scannedBlock[3] = -3;
-			scannedBlock[4] = 0;
-			scannedBlock[5] = 0;
-			scannedBlock[6] = -1;
-			scannedBlock[7] = 0;
+			scannedBlock[0] = 0;
+			scannedBlock[1] = 3;
+			scannedBlock[2] = 0;
+			scannedBlock[3] = 1;
+			scannedBlock[4] = -1;
+			scannedBlock[5] = -1;
+			scannedBlock[6] = 0;
+			scannedBlock[7] = 1;
 			scannedBlock[8] = 0;
 			scannedBlock[9] = 0;
 			scannedBlock[10] = 0;
@@ -93,7 +92,6 @@ unsigned char * EntropyEncode::encodeVLC(float *pDCTBuf, int iWidth, int iHeight
 			scannedBlock[13] = 0;
 			scannedBlock[14] = 0;
 			scannedBlock[15] = 0;
-			*/
 			
 			//count coeff tokens
 			coeffTokens = countCoeffToken(scannedBlock);

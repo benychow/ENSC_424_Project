@@ -24,6 +24,8 @@ using namespace std;
 
 #include "codeclib.h"
 
+#include "EntropyDecode.h"
+
 void usage() {
     cout << "Image decoder with inverse quantizer, inverse DCT:" << endl;;
     cout << "Usage: acdec infile outfile.pgm" << endl;
@@ -38,6 +40,7 @@ int main(int argc,char **argv) {
     int iWidth, iHeight;
     unsigned char *pcImgBuf;
     float *pDCTBuf;
+	unsigned char *pDCTBuf2;
     float fQstep;
 	int iQMtd;
 
@@ -84,25 +87,30 @@ int main(int argc,char **argv) {
     IDecoder *pDecoder = new IDecoder(iWidth, iHeight);
 
     pDCTBuf = new float[iImageArea];
+	pDCTBuf2 = new unsigned char[43009];
     if (!pDCTBuf) {
         cout << "Fail to create DCT buffer." << endl;
         return -7;
     }
+	ifsInfile.read((char *)pDCTBuf2, 43009);
+    //ifsInfile.read((char *)pDCTBuf, iImageArea * sizeof(float));
 
-    ifsInfile.read((char *)pDCTBuf, iImageArea * sizeof(float));
+	EntropyDecode *test = new EntropyDecode();
+	test->decodeVLC(pDCTBuf2, iWidth, iHeight, fQstep, iQMtd);
+
 
     // Decode image
-    pDecoder->decodeImage(pDCTBuf, fQstep, iQMtd);
+    //pDecoder->decodeImage(pDCTBuf, fQstep, iQMtd);
 
     // Copy to output buf, add 128
-    pDecoder->GetImage(pcImgBuf);
+    //pDecoder->GetImage(pcImgBuf);
     
     //Output PGM header
-    ofsOutfile << "P5\n" << iWidth << " " << iHeight << endl;
-    ofsOutfile << "255" << endl;
-    ofsOutfile.write((const char *)pcImgBuf, iImageArea);
-    ifsInfile.close();
-    ofsOutfile.close();
+    //ofsOutfile << "P5\n" << iWidth << " " << iHeight << endl;
+    //ofsOutfile << "255" << endl;
+    //ofsOutfile.write((const char *)pcImgBuf, iImageArea);
+    //ifsInfile.close();
+    //ofsOutfile.close();
 
     delete pDecoder;
     delete pcImgBuf;
