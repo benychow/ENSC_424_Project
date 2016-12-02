@@ -30,5 +30,8 @@ public:
 	void decodeVLC(unsigned char *inputBuffer, int iWidth, int iHeight, float fQstep, int iQMtd);
 	int ShowBits(byte buffer[], int totbitoffset, int bitcount, int numbits);
 	int readSyntaxElement_NumCoeffTrailingOnes(SyntaxElement *sym, Bitstream *currStream, char *type);
+	int readSyntaxElement_FLC(SyntaxElement *sym, Bitstream *currStream);
+	int readSynTaxElement_level_VLC0(SyntaxElement *sym, Bitstream *currStream);
+	int readSyntaxElement_Level_VLCN(SyntaxElement *sym, int vlc, Bitstream *currStream);
 private:
 };
