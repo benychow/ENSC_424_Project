@@ -8,6 +8,19 @@ using namespace std;
 
 #define MAXRTPPAYLOADLEN (65536 - 40)
 
+void fillArrayZeros(int *inputArray)
+{
+	for (int k = 0; k < 16; k++)
+	{
+		inputArray[k] = 0;
+	}
+}
+
+static inline int imin(int a, int b)
+{
+	return ((a) < (b)) ? (a) : (b);
+}
+
 int GetBits(byte buffer[], int totbitoffset, int *info, int bitcount, int numbits)
 {
 	if ((totbitoffset + numbits) > bitcount)
@@ -90,12 +103,12 @@ EntropyDecode::~EntropyDecode(void)
 {
 }
 
-void EntropyDecode::decodeVLC(unsigned char *inputBuffer, int iWidth, int iHeight, float fQstep, int iQMtd)
+void EntropyDecode::decodeVLC(float *outputBuffer, unsigned char *inputBuffer, int iWidth, int iHeight, float fQstep, int iQMtd)
 {
 	//input buffer contains our relevant bitstream
 	//for now ignore quantization
 	SyntaxElement currSE;
-	Bitstream currStream; 
+	Bitstream currStream;
 
 	currStream.streamBuffer = inputBuffer;
 	char type[15];
@@ -103,112 +116,334 @@ void EntropyDecode::decodeVLC(unsigned char *inputBuffer, int iWidth, int iHeigh
 	currStream.frame_bitoffset = 0;
 	currStream.bitstream_length = 43009; //for this example specifically, will be passed into func later
 
-
-	//predict neighbour non-zero coefficients
-	//for now assume 0 because first block
-	int nnz = 0;
-
-	currSE.value1 = (nnz < 2) ? 0 : ((nnz < 4) ? 1 : ((nnz < 8) ? 2 : 3));
-	readSyntaxElement_NumCoeffTrailingOnes(&currSE, &currStream, type);
-
 	int numcoeff, numtrailingones, numones, ntr, code, level_two_or_higher;
-	int vlcnum, abslevel;
-	int levarr[16] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+	int vlcnum, abslevel, totzeros, zerosleft;
+	int *levarr = new int[16];
+	int *runarr = new int[16];
+	int *recArray = new int[16];
 	static const int incVlc[] = { 0, 3, 6, 12, 24, 48, 32768 };    // maximum vlc = 6
 
-	//decode numcoeff and num trailing ones
-	numcoeff = currSE.value1;
-	numtrailingones = currSE.value2;
+	fillArrayZeros(levarr);
+	fillArrayZeros(runarr);
+	fillArrayZeros(recArray);
 
-	//decode trailing one signs
-	numones = numtrailingones;
+	int *coeffStorage = new int[(iWidth * iHeight) / 16];
 
-	if (numcoeff)
+	//for all macroblocks 
+	for (int position = 0; position < ((iWidth * iHeight) / 16); position++)
 	{
-		if (numtrailingones)
+
+		//predict neighbour non-zero coefficients
+		//for now assume 0 because first block
+		int nnz = predict_nnz(position, iWidth, iHeight, coeffStorage);
+
+		//predict_nnz from top and left neighbours
+		//*****************************************
+
+		currSE.value1 = (nnz < 2) ? 0 : ((nnz < 4) ? 1 : ((nnz < 8) ? 2 : 3));
+		readSyntaxElement_NumCoeffTrailingOnes(&currSE, &currStream, type);
+
+		//decode numcoeff and num trailing ones
+		numcoeff = currSE.value1;
+		numtrailingones = currSE.value2;
+
+		//store numcoeff for other predictions
+		coeffStorage[position] = numcoeff;
+
+		//decode trailing one signs
+		numones = numtrailingones;
+
+		if (numcoeff)
 		{
-			currSE.len = numtrailingones;
+			if (numtrailingones)
+			{
+				currSE.len = numtrailingones;
 
-			readSyntaxElement_FLC(&currSE, &currStream);
+				readSyntaxElement_FLC(&currSE, &currStream);
 
-			code = currSE.inf;
-			ntr = numtrailingones; //ntr = numtrailingones
+				code = currSE.inf;
+				ntr = numtrailingones; //ntr = numtrailingones
+
+		//place trailing ones into temp array levarr
+				for (int j = numcoeff - 1; j > numcoeff - 1 - numtrailingones; j--)
+				{
+					ntr--;
+					levarr[j] = (code >> ntr) & 1 ? -1 : 1;
+				}
+			}
+
+			//decode levels
+			if (numcoeff > 3 && numtrailingones == 3)
+			{
+				level_two_or_higher = 0;
+			}
+			else
+			{
+				level_two_or_higher = 1;
+			}
+
+			if (numcoeff > 10 && numtrailingones < 3)
+			{
+				vlcnum = 1;
+			}
+			else
+			{
+				vlcnum = 0;
+			}
+
+			for (int k = numcoeff - 1 - numtrailingones; k >= 0; k--)
+			{
+				if (vlcnum == 0)
+				{
+					readSynTaxElement_level_VLC0(&currSE, &currStream);
+				}
+				else
+				{
+					readSyntaxElement_Level_VLCN(&currSE, vlcnum, &currStream);
+				}
+
+				if (level_two_or_higher)
+				{
+					currSE.inf += (currSE.inf > 0) ? 1 : -1;
+					level_two_or_higher = 0;
+				}
+
+				levarr[k] = currSE.inf;
+				abslevel = abs(levarr[k]);
+
+				if (abslevel == 1)
+				{
+					++numones;
+				}
+
+				// update VLC table
+				if (abslevel > incVlc[vlcnum])
+				{
+					++vlcnum;
+				}
+
+				if (k == numcoeff - 1 - numtrailingones && abslevel > 3)
+				{
+					vlcnum = 2;
+				}
+			}
+
+			if (numcoeff < 16)
+			{
+				//decode total run
+				vlcnum = numcoeff - 1;
+				currSE.value1 = vlcnum;
+
+				//decode to zeros
+				readSyntaxElement_TotalZeros(&currSE, &currStream);
+
+				totzeros = currSE.value1;
+			}
+			else
+			{
+				totzeros = 0;
+			}
+
+			// decode run before each coefficient
+			zerosleft = totzeros;
+			int i = numcoeff - 1;
+
+			if (zerosleft > 0 && i > 0)
+			{
+				do
+				{
+					// select vlc for runbefore
+					vlcnum = imin(zerosleft - 1, 6);
+
+					currSE.value1 = vlcnum;
+
+					readSyntaxElement_Run(&currSE, &currStream);
+					runarr[i] = currSE.value1;
+
+					zerosleft -= runarr[i];
+					i--;
+				} while (zerosleft != 0 && i != 0);
+			}
+			runarr[i] = zerosleft;
 		}
-	}
+		reconstructScannedArray(recArray, levarr, runarr);
+		//pass reconstructed array back to output buffer but as float type
 
-	//place trailing ones into temp array levarr
-	for (int j = numcoeff - 1; j > numcoeff - 1 - numtrailingones; j--)
-	{
-		ntr--;
-		levarr[j] = (code >> ntr) & 1 ? -1 : 1;
+		cout << "WOW AMASING" << endl;
 	}
+}
 
-	//decode levels
-	if (numcoeff > 3 && numtrailingones == 3)
+//copies the reconstructed and array back into the output buffer at specific position
+void EntropyDecode::sendBack(int position, int *recArray, float *outputBuffer)
+{
+
+}
+
+//predicts the neighbouring total non-zero coefficients
+int EntropyDecode::predict_nnz(int position, int iWidth, int iHeight, int *coefficientStorage)
+{
+	int nnz;
+	int nnzTop;
+	int nnzLeft;
+	//edge cases will only have 1 neighbour or no neighbour if first case
+	//top left corner case, no neighbours either side
+	if (position == 0)
 	{
-		level_two_or_higher = 0;
+		//vlc 0 will be used
+		nnz = 0;
+		return nnz;
+	}
+	//top row case
+	else if (position < (iWidth / 4))
+	{
+		nnz = coefficientStorage[position - 1]; //left neighbour
+		return nnz;
+	}
+	//left edge case
+	else if (position % (iWidth / 4) == 0)
+	{
+		nnz = coefficientStorage[position - (iWidth / 4)]; //top neighbour
+		return nnz;
 	}
 	else
 	{
-		level_two_or_higher = 1;
-	}
+		nnzLeft = coefficientStorage[position - 1];
+		nnzTop = coefficientStorage[position - (iWidth / 4)];
 
-	if (numcoeff > 10 && numtrailingones < 3)
+		nnz = (nnzLeft + nnzTop) / 2;
+		return nnz;
+	}
+}
+
+//takes in the levarray and runarray and reconstructs the zig-zag scanned array
+void EntropyDecode::reconstructScannedArray(int *outputArray, int *levArray, int *runArray)
+{
+	int pos = 0;
+	int runs;
+	int levCounter = 0;
+	int runCounter = 0;
+
+	while (pos < 16)
 	{
-		vlcnum = 1;
+		//check if any runs
+		//if run, pad with 0 for run value
+		if (runArray[runCounter] > 0)
+		{
+			int runs = runArray[runCounter];
+
+			runCounter++;
+
+			while (runs > 0)
+			{
+				outputArray[pos] = 0;
+				runs--;
+				pos++;
+			}
+
+			outputArray[pos] = levArray[levCounter];
+			pos++;
+			levCounter++;
+		}
+		else //if no runs, the value at the return array should be from level array
+		{
+			outputArray[pos] = levArray[levCounter];
+			pos++;
+			levCounter++;
+			runCounter++;
+		}
 	}
-	else
+}
+
+int EntropyDecode::readSyntaxElement_Run(SyntaxElement *sym, Bitstream *currStream)
+{
+	static const byte lentab[15][16] =
 	{
-		vlcnum = 0;
-	}
+		{ 1,1 },
+		{ 1,2,2 },
+		{ 2,2,2,2 },
+		{ 2,2,2,3,3 },
+		{ 2,2,3,3,3,3 },
+		{ 2,3,3,3,3,3,3 },
+		{ 3,3,3,3,3,3,3,4,5,6,7,8,9,10,11 },
+	};
 
-	for (int k = numcoeff - 1 - numtrailingones; k >= 0; k--)
+	static const byte codtab[15][16] =
 	{
-		if (vlcnum == 0)
-		{
-			readSynTaxElement_level_VLC0(&currSE, &currStream);
-		}
-		else
-		{
-			readSyntaxElement_Level_VLCN(&currSE, vlcnum, &currStream);
-		}
+		{ 1,0 },
+		{ 1,1,0 },
+		{ 3,2,1,0 },
+		{ 3,2,1,1,0 },
+		{ 3,2,3,2,1,0 },
+		{ 3,0,1,3,2,5,4 },
+		{ 7,6,5,4,3,2,1,1,1,1,1,1,1,1,1 },
+	};
+	int code;
+	int vlcnum = sym->value1;
+	int retval = code_from_bitstream_2d(sym, currStream, &lentab[vlcnum][0], &codtab[vlcnum][0], 16, 1, &code);
 
-		if (level_two_or_higher)
-		{
-			currSE.inf += (currSE.inf > 0) ? 1 : -1;
-			level_two_or_higher = 0;
-		}
-
-		levarr[k] = currSE.inf;
-		abslevel = abs(levarr[k]);
-
-		if (abslevel == 1)
-		{
-			++numones;
-		}
-
-		// update VLC table
-		if (abslevel > incVlc[vlcnum])
-		{
-			++vlcnum;
-		}
-
-		if (k == numcoeff - 1 - numtrailingones && abslevel > 3)
-		{
-			vlcnum = 2;
-		}
-
-		if (numcoeff < 16)
-		{
-			//decode total run
-			vlcnum = numcoeff - 1;
-			currSE.value1 = vlcnum;
-
-			//decode to zeros
-		}
+	if (retval)
+	{
+		printf("ERROR: failed to find Run\n");
+		exit(-1);
 	}
-	
-	cout << "WOW AMASING" << endl;
+
+	return retval;
+}
+
+
+
+int EntropyDecode::readSyntaxElement_TotalZeros(SyntaxElement *sym, Bitstream *currStream)
+{
+	static const byte lentab[15][16] =
+	{
+
+		{ 1,3,3,4,4,5,5,6,6,7,7,8,8,9,9,9 },
+		{ 3,3,3,3,3,4,4,4,4,5,5,6,6,6,6 },
+		{ 4,3,3,3,4,4,3,3,4,5,5,6,5,6 },
+		{ 5,3,4,4,3,3,3,4,3,4,5,5,5 },
+		{ 4,4,4,3,3,3,3,3,4,5,4,5 },
+		{ 6,5,3,3,3,3,3,3,4,3,6 },
+		{ 6,5,3,3,3,2,3,4,3,6 },
+		{ 6,4,5,3,2,2,3,3,6 },
+		{ 6,6,4,2,2,3,2,5 },
+		{ 5,5,3,2,2,2,4 },
+		{ 4,4,3,3,1,3 },
+		{ 4,4,2,1,3 },
+		{ 3,3,1,2 },
+		{ 2,2,1 },
+		{ 1,1 },
+	};
+
+	static const byte codtab[15][16] =
+	{
+		{ 1,3,2,3,2,3,2,3,2,3,2,3,2,3,2,1 },
+		{ 7,6,5,4,3,5,4,3,2,3,2,3,2,1,0 },
+		{ 5,7,6,5,4,3,4,3,2,3,2,1,1,0 },
+		{ 3,7,5,4,6,5,4,3,3,2,2,1,0 },
+		{ 5,4,3,7,6,5,4,3,2,1,1,0 },
+		{ 1,1,7,6,5,4,3,2,1,1,0 },
+		{ 1,1,5,4,3,3,2,1,1,0 },
+		{ 1,1,1,3,3,2,2,1,0 },
+		{ 1,0,1,3,2,1,1,1, },
+		{ 1,0,1,3,2,1,1, },
+		{ 0,1,1,2,1,3 },
+		{ 0,1,1,1,1 },
+		{ 0,1,1,1 },
+		{ 0,1,1 },
+		{ 0,1 },
+	};
+
+	int code;
+	int vlcnum = sym->value1;
+	int retval = code_from_bitstream_2d(sym, currStream, &lentab[vlcnum][0], &codtab[vlcnum][0], 16, 1, &code);
+
+	if (retval)
+	{
+		printf("ERROR: failed to find Total Zeros !cdc\n");
+		exit(-1);
+	}
+
+	return  retval;
 }
 
 int EntropyDecode::readSyntaxElement_Level_VLCN(SyntaxElement *sym, int vlc, Bitstream *currStream)

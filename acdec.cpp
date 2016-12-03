@@ -96,7 +96,7 @@ int main(int argc,char **argv) {
     //ifsInfile.read((char *)pDCTBuf, iImageArea * sizeof(float));
 
 	EntropyDecode *test = new EntropyDecode();
-	test->decodeVLC(pDCTBuf2, iWidth, iHeight, fQstep, iQMtd);
+	test->decodeVLC(pDCTBuf, pDCTBuf2, iWidth, iHeight, fQstep, iQMtd);
 
 
     // Decode image
