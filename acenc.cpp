@@ -12,6 +12,8 @@
  * Ver 1, Feb. 2005
  * Ver 2, Sept. 2012
  *
+ * Modified by Benny Chou	-	Nov. 2016
+ * -implemented CAVLC entropy encoding
  *********************************************************************************/
 
 #include <iostream>
@@ -198,7 +200,7 @@ int main(int argc, char **argv) {
 		ifsInfile.close();
 		ofsOutfile.close();
 	}
-	else if (entType == 1)
+	else if (entType == 1) //Huffman encoding not yet implemented
 	{
 		cout << "Huffman entropy coding is used." << endl;
 		//calculate probabilityes for huffman
@@ -243,15 +245,16 @@ int main(int argc, char **argv) {
 		EntropyEncode *vlcencode = new EntropyEncode();
 		bitOutBuf = vlcencode ->encodeVLC(pDCTBuf, iWidth, iHeight, sizeVLCBuf);
 
-		cout << *sizeVLCBuf - 1 << endl;
+		cout << "size of VLC buffer " << *sizeVLCBuf - 1 << endl;
 
 		ofsOutfile.write((const char *)bitOutBuf, *sizeVLCBuf);
+
+		cout << "Write Success!" << endl;
 
 		ifsInfile.close();
 		ofsOutfile.close();
 
 	}
-
 
     delete pEncoder;
     delete pcImgBuf;

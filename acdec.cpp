@@ -13,6 +13,8 @@
  * Ver 2, Sept. 2012
  * Ver 3: Sept. 2013
  *
+ * Modified by Benny CHou	-	Nov. 2016
+ * -implemented CAVLC decoding
  *********************************************************************************/
 #include <iostream>
 #include <fstream>
@@ -98,6 +100,10 @@ int main(int argc,char **argv) {
 	EntropyDecode *test = new EntropyDecode();
 	test->decodeVLC(pDCTBuf, pDCTBuf2, iWidth, iHeight, fQstep, iQMtd);
 
+	/* INCOMPLETE CODE*/
+	// decodeVLC should return pDCTBuf with the relevant decoded coefficients arranged row by row
+	// pDCTBuf is then passed back into decodeImage and GetImage from base codec to re-obtain dequantized and transformed data
+	// Also missing function to detect whether decoding is necessary based on input .out file
 
     // Decode image
     //pDecoder->decodeImage(pDCTBuf, fQstep, iQMtd);

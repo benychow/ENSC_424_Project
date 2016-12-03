@@ -1,3 +1,10 @@
+// EntropyEncode.h
+// Source file for EntropyEncode.h
+// File defines functions declared in header
+// File contains references from the H.264 Reference Software. 
+// Author: Benny Chou
+// Created: Nov. 2016
+
 #include "EntropyEncode.h"
 #include <stdio.h>
 #include <iostream>
@@ -75,6 +82,8 @@ unsigned char * EntropyEncode::encodeVLC(float *pDCTBuf, int iWidth, int iHeight
 			xStart2 = xStart1 + j * 4; //Starting location for top left of each 4x4 dct block
 
 			scannedBlock = zScan(pDCTBuf, xStart2, iWidth);
+
+			//replace zScan function call to scanned block with known values for an test case
 			/*
 			scannedBlock[0] = 0;
 			scannedBlock[1] = 3;
@@ -93,6 +102,7 @@ unsigned char * EntropyEncode::encodeVLC(float *pDCTBuf, int iWidth, int iHeight
 			scannedBlock[14] = 0;
 			scannedBlock[15] = 0;
 			*/
+
 			//count coeff tokens
 			coeffTokens = countCoeffToken(scannedBlock);
 			//store the coeff tokens in 3d array

@@ -1,3 +1,10 @@
+// EntropyDecode.cpp
+// Source file for EntropyDecode.h
+// File defines functions declared in header
+// File contains references from H.264 Reference Software
+// Author: Benny Chou
+// Created: Nov. 2016
+
 #include "EntropyDecode.h"
 #include <stdio.h>
 #include <iostream>
@@ -132,15 +139,22 @@ void EntropyDecode::decodeVLC(float *outputBuffer, unsigned char *inputBuffer, i
 	//for all macroblocks 
 	for (int position = 0; position < ((iWidth * iHeight) / 16); position++)
 	{
+		fillArrayZeros(levarr);
+		fillArrayZeros(runarr);
+		fillArrayZeros(recArray);
 
 		//predict neighbour non-zero coefficients
-		//for now assume 0 because first block
 		int nnz = predict_nnz(position, iWidth, iHeight, coeffStorage);
 
-		//predict_nnz from top and left neighbours
-		//*****************************************
+		if (position == 0)
+		{
+			currSE.value1 = 0;
+		}
+		else
+		{
+			currSE.value1 = (nnz < 2) ? 0 : ((nnz < 4) ? 1 : ((nnz < 8) ? 2 : 3));
+		}
 
-		currSE.value1 = (nnz < 2) ? 0 : ((nnz < 4) ? 1 : ((nnz < 8) ? 2 : 3));
 		readSyntaxElement_NumCoeffTrailingOnes(&currSE, &currStream, type);
 
 		//decode numcoeff and num trailing ones
@@ -268,15 +282,52 @@ void EntropyDecode::decodeVLC(float *outputBuffer, unsigned char *inputBuffer, i
 		}
 		reconstructScannedArray(recArray, levarr, runarr);
 		//pass reconstructed array back to output buffer but as float type
-
-		cout << "WOW AMASING" << endl;
+		sendBack(position, recArray, outputBuffer, iWidth, iHeight);
 	}
 }
 
 //copies the reconstructed and array back into the output buffer at specific position
-void EntropyDecode::sendBack(int position, int *recArray, float *outputBuffer)
+//needs to place in reverse zig zag order
+void EntropyDecode::sendBack(int position, int *recArray, float *outputBuffer, int iWidth, int iHeight)
 {
+	int heightLoc = 0;
+	int widthLoc = 0;
+	int topLeftCorner = 0;
 
+	if (position == 0)
+	{
+		heightLoc = 0;
+	}
+	else
+	{
+		heightLoc = (iWidth / 4) % position;//height of macroblock
+	}
+
+	topLeftCorner = position * 4 + heightLoc * (iWidth * 4); //top left corner of macroblock is related to x (position) and y (heightLoc)
+
+	//top row
+	outputBuffer[topLeftCorner] = (float)recArray[0];
+	outputBuffer[topLeftCorner + 1] = (float)recArray[1];
+	outputBuffer[topLeftCorner + 2] = (float)recArray[5];
+	outputBuffer[topLeftCorner + 3] = (float)recArray[6];
+
+	//second row
+	outputBuffer[topLeftCorner + iWidth] = (float)recArray[2];
+	outputBuffer[topLeftCorner + iWidth + 1] = (float)recArray[4];
+	outputBuffer[topLeftCorner + iWidth + 2] = (float)recArray[7];
+	outputBuffer[topLeftCorner + iWidth + 3] = (float)recArray[12];
+
+	//third row
+	outputBuffer[topLeftCorner + (iWidth * 2)] = (float)recArray[3];
+	outputBuffer[topLeftCorner + (iWidth * 2) + 1] = (float)recArray[8];
+	outputBuffer[topLeftCorner + (iWidth * 2) + 2] = (float)recArray[11];
+	outputBuffer[topLeftCorner + (iWidth * 2) + 3] = (float)recArray[13];
+
+	//fourth row
+	outputBuffer[topLeftCorner + (iWidth * 3)] = (float)recArray[9];
+	outputBuffer[topLeftCorner + (iWidth * 3) + 1] = (float)recArray[10];
+	outputBuffer[topLeftCorner + (iWidth * 3) + 2] = (float)recArray[14];
+	outputBuffer[topLeftCorner + (iWidth * 3) + 3] = (float)recArray[15];
 }
 
 //predicts the neighbouring total non-zero coefficients

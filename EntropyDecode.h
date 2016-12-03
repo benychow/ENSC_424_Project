@@ -1,3 +1,10 @@
+// EntropyDecode.h
+// Provides header file for necessary functions to implement CAVLC decoding
+// with base codec from homework assignment 2. 
+// File contains references from H.264 Reference Software.
+// Author: Benny Chou
+// Created: Nov. 2016
+
 #pragma once
 typedef unsigned char byte;
 
@@ -37,6 +44,6 @@ public:
 	int readSyntaxElement_Run(SyntaxElement *sym, Bitstream *currStream);
 	void reconstructScannedArray(int *outputArray, int *levArray, int *runArray);
 	int predict_nnz(int position, int iWidth, int iHeight, int *coefficientStorage);
-	void sendBack(int position, int *recArray, float *outputBuffer);
+	void sendBack(int position, int *recArray, float *outputBuffer, int iWidth, int iHeight);
 private:
 };

@@ -1,3 +1,11 @@
+// EntropyEncode.h
+// Provides header file for necessary functiosn to implement CAVLC encoding
+// with base codec from homework assignment 2.
+// File contains references from the H.264 Reference Software. 
+// Author: Benny Chou
+// Created: Nov. 2016
+
+
 #pragma once
 typedef unsigned char byte;
 

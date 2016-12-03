@@ -1,6 +1,6 @@
 ﻿C:\Program Files (x86)\MSBuild\Microsoft.Cpp\v4.0\V140\Microsoft.CppBuild.targets(392,5): warning MSB8028: The intermediate directory (.\Debug\) contains files shared from another project (acenc.vcxproj, psnr.vcxproj).  This can lead to incorrect clean and rebuild behavior.
   EntropyDecode.cpp
-e:\documents\sfu\ensc 424\project\ensc_424_project\entropydecode.cpp(322): warning C4101: 'runs': unreferenced local variable
+e:\documents\sfu\ensc 424\project\ensc_424_project\entropydecode.cpp(373): warning C4101: 'runs': unreferenced local variable
   acdec.cpp
   Generating Code...
 acdec.obj : warning LNK4075: ignoring '/EDITANDCONTINUE' due to '/OPT:LBR' specification
